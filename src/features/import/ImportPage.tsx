@@ -6,6 +6,7 @@ import {
   Film,
   ImagePlus,
   Loader2,
+  Plus,
   ScanText,
   Sparkles,
   Trash2,
@@ -383,7 +384,7 @@ function ScreenshotMode({
             Drop screenshots or tap to choose
           </span>
           <span className="block text-xs text-muted-foreground">
-            Screenshot your Notes app — one or many. PNG / JPG.
+            Screenshot your Notes app — add them one at a time or many at once. PNG / JPG.
           </span>
         </span>
       </button>
@@ -406,9 +407,19 @@ function ScreenshotMode({
             <span className="text-sm text-muted-foreground">
               {images.length} image{images.length === 1 ? '' : 's'} ready
             </span>
-            <Button variant="ghost" size="sm" onClick={onClear} disabled={busy}>
-              <Trash2 aria-hidden /> Clear
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => inputRef.current?.click()}
+                disabled={busy}
+              >
+                <ImagePlus aria-hidden /> Add more
+              </Button>
+              <Button variant="ghost" size="sm" onClick={onClear} disabled={busy}>
+                <Trash2 aria-hidden /> Clear
+              </Button>
+            </div>
           </div>
           <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4">
             {images.map((file, idx) => (
@@ -433,6 +444,18 @@ function ScreenshotMode({
                 </button>
               </li>
             ))}
+            <li>
+              <button
+                type="button"
+                onClick={() => inputRef.current?.click()}
+                disabled={busy}
+                aria-label="Add another screenshot"
+                className="flex aspect-square w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border bg-surface/40 text-muted-foreground transition-colors hover:border-highlight/40 hover:bg-surface-elevated hover:text-highlight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-60"
+              >
+                <Plus className="size-5" aria-hidden />
+                <span className="text-xs">Add one</span>
+              </button>
+            </li>
           </ul>
         </div>
       ) : null}

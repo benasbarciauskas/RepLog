@@ -17,6 +17,12 @@ export function useWorkouts(): Workout[] {
   return useLiveQuery(() => db.workouts.orderBy('date').toArray(), [], []);
 }
 
+/** Live count of stored workouts. `undefined` until the query resolves — lets
+ *  callers tell "still loading" apart from "genuinely empty". */
+export function useWorkoutCount(): number | undefined {
+  return useLiveQuery(() => db.workouts.count());
+}
+
 /** Live list of all imported raw notes, newest first. */
 export function useNotes(): RawNote[] {
   return useLiveQuery(
