@@ -6,6 +6,12 @@ import { MemoryRouter } from 'react-router-dom';
 const useWorkoutsMock = vi.fn<() => unknown[]>(() => []);
 vi.mock('@/data/hooks', () => ({
   useWorkouts: () => useWorkoutsMock(),
+  // Dashboard + Coach (rendered at "/" and "/coach") also read these; the shell
+  // test only cares that the page mounts, so empty arrays are enough.
+  useBests: () => [],
+  useBlocks: () => [],
+  useBodyweightSeries: () => [],
+  useCoachFindings: () => [],
 }));
 
 // Render the shell at a given route. App provides no Router, so we wrap it.
