@@ -1,5 +1,9 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './db';
+import { computeBests } from '@/analytics/bests';
+import { inferBlocks } from '@/analytics/blocks';
+import { bodyweightSeries } from '@/analytics/bodyweight';
+import { analyzeImbalances } from '@/coach/analyze';
 import type {
   CoachFinding,
   ExerciseBest,
@@ -22,35 +26,26 @@ export function useNotes(): RawNote[] {
   );
 }
 
-/**
- * All-time bests derived from the live workout set.
- * Stubbed to [] — `computeBests()` (analytics) lands in Wave 1; wired in Wave 2.
- */
+/** All-time bests derived live from the stored workouts. Recomputes on DB change. */
 export function useBests(): ExerciseBest[] {
-  const workouts = useWorkouts();
-  // wired in Wave 2: return computeBests(workouts);
-  void workouts;
-  return [];
+  return useLiveQuery(async () => computeBests(await db.workouts.toArray()), [], []);
 }
 
-/**
- * Strength-imbalance coach findings, ordered priority → flag → ok.
- * Stubbed to [] — `analyzeImbalances()` (coach) lands in Wave 1; wired in Wave 2.
- */
+/** Strength-imbalance coach findings (priority → flag → ok), live from the data. */
 export function useCoachFindings(): CoachFinding[] {
-  const bests = useBests();
-  // wired in Wave 2: return analyzeImbalances(bests);
-  void bests;
-  return [];
+  return useLiveQuery(
+    async () => analyzeImbalances(computeBests(await db.workouts.toArray())),
+    [],
+    [],
+  );
 }
 
-/**
- * Inferred training blocks (contiguous same-split sessions).
- * Stubbed to [] — `inferBlocks()` (analytics) lands in Wave 1; wired in Wave 2.
- */
+/** Inferred training blocks (contiguous same-split sessions), live. */
 export function useBlocks(): TrainingBlock[] {
-  const workouts = useWorkouts();
-  // wired in Wave 2: return inferBlocks(workouts);
-  void workouts;
-  return [];
+  return useLiveQuery(async () => inferBlocks(await db.workouts.toArray()), [], []);
+}
+
+/** Bodyweight-over-time series for the trend chart, live. */
+export function useBodyweightSeries(): { date: string; kg: number }[] {
+  return useLiveQuery(async () => bodyweightSeries(await db.workouts.toArray()), [], []);
 }
