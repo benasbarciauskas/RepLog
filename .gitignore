@@ -48,3 +48,7 @@ coverage/
 # Misc
 .tmp/
 tmp/
+.claude-flow/
+.swarm/
+*.session.json
+*.key

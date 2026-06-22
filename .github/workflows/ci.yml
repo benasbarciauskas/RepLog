@@ -1,0 +1,38 @@
+name: ci
+on:
+  pull_request:
+    branches: [main, beta]
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Locate web app
+        id: web
+        run: |
+          if [ -f web/package.json ]; then echo "dir=web" >> "$GITHUB_OUTPUT"
+          elif [ -f package.json ]; then echo "dir=." >> "$GITHUB_OUTPUT"
+          else echo "dir=" >> "$GITHUB_OUTPUT"; fi
+      - name: Install / lint / build
+        if: steps.web.outputs.dir != ''
+        working-directory: ${{ steps.web.outputs.dir }}
+        run: |
+          npm ci || npm install
+          npm run lint --if-present
+          npm run build --if-present
+      - name: Python compile (Flask side, if present)
+        run: python -m compileall . -q || true
+      - name: Dependency audit (high+)
+        if: steps.web.outputs.dir != ''
+        working-directory: ${{ steps.web.outputs.dir }}
+        run: npm audit --audit-level=high || echo "::warning::npm audit found issues (non-blocking)"
+      - name: Secret scan (block on hardcoded credentials)
+        run: |
+          PAT='sk-[A-Za-z0-9]{20}|gh[pousr]_[A-Za-z0-9]{30,}|shpat_[a-f0-9]{32}|AIza[0-9A-Za-z_-]{30,}|xai-[A-Za-z0-9]{40,}|gsk_[A-Za-z0-9]{40,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY'
+          if git grep -nIE "$PAT" -- . ':!*.lock' ':!*package-lock.json' ':!*.map' ':!.claude/' ':!*.min.js' | grep -ivE 'example|sample|placeholder|YOUR_|dummy|PGP PRIVATE KEY BLOCK'; then
+            echo "::error::Hardcoded secret detected in tracked files. Rotate it and move to env/keychain."; exit 1
+          fi
+          echo "no hardcoded secrets detected"
