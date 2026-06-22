@@ -2,9 +2,16 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Dark-first design tokens (shadcn new-york, base color neutral, CSS variables).
-   Defaults are the dark palette; the optional :root light block is the inverse. */
+/* ============================================================================
+   RepLog design tokens — dark-first, athletic, data-forward.
+   Vibe: Linear-grade cleanliness with energy. PRs / 1RMs / weights are the
+   heroes (big tabular display numbers). ONE electric accent (acid lime) used
+   sparingly for emphasis, PRs, and the active nav. shadcn CSS-var compatible.
+   See DESIGN.md for the full rationale + usage rules.
+   ============================================================================ */
+
 @theme inline {
+  /* shadcn-compatible semantic color bindings (consumed by ui/* components) */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -28,60 +35,119 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+
+  /* RepLog semantic extensions (use these in app code) */
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-highlight: var(--highlight);
+  --color-highlight-foreground: var(--highlight-foreground);
+  --color-highlight-muted: var(--highlight-muted);
+  --color-success: var(--success);
+  --color-warn: var(--warn);
+
+  /* radius scale */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  /* type families — Geist-style grotesk feel via system grotesk fallback stack.
+     Numbers (weights, 1RMs, PRs) render in a tabular grotesk so columns align. */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code",
+    Menlo, Consolas, monospace;
+
+  /* display type scale — the hero number sizes for the dashboard */
+  --text-display-sm: 1.875rem; /* 30px */
+  --text-display-md: 2.75rem; /*  44px */
+  --text-display-lg: 4rem; /*    64px */
+  --text-display-xl: 5.25rem; /* 84px */
+
+  /* motion — strong custom curves (built-in CSS easings are too weak) */
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out-strong: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-/* Dark is the default. */
+/* Dark is the default and the page is theme-locked to dark (html.dark). */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
+  --radius: 0.75rem;
+
+  /* base neutrals — warm-cool near-black, never pure #000 */
+  --background: oklch(0.16 0.004 260);
+  --foreground: oklch(0.97 0.003 250);
+
+  /* surfaces: card sits above background, elevated above card */
+  --surface: oklch(0.2 0.005 260);
+  --surface-elevated: oklch(0.24 0.006 260);
+  --card: oklch(0.2 0.005 260);
+  --card-foreground: oklch(0.97 0.003 250);
+  --popover: oklch(0.22 0.006 260);
+  --popover-foreground: oklch(0.97 0.003 250);
+
+  /* primary = bright neutral (shadcn default-button surface) */
+  --primary: oklch(0.92 0.004 250);
+  --primary-foreground: oklch(0.2 0.005 260);
+
+  --secondary: oklch(0.27 0.006 260);
+  --secondary-foreground: oklch(0.97 0.003 250);
+  --muted: oklch(0.27 0.006 260);
+  --muted-foreground: oklch(0.7 0.01 260);
+
+  /* accent (shadcn hover/selected fill) — kept neutral so the highlight pops */
+  --accent: oklch(0.27 0.006 260);
+  --accent-foreground: oklch(0.97 0.003 250);
+
+  /* THE one electric accent — acid lime. The energy of the brand.
+     Used sparingly: PRs, active nav, primary emphasis, hero number glints. */
+  --highlight: oklch(0.86 0.21 130);
+  --highlight-foreground: oklch(0.2 0.06 130);
+  --highlight-muted: oklch(0.86 0.21 130 / 12%);
+
+  --success: oklch(0.78 0.16 155);
+  --warn: oklch(0.82 0.16 75);
+  --destructive: oklch(0.65 0.2 25);
+
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 13%);
+  --ring: var(--highlight);
+
+  /* charts — lime-led, with cool complements that read on dark */
+  --chart-1: var(--highlight);
+  --chart-2: oklch(0.7 0.13 220);
+  --chart-3: oklch(0.78 0.16 75);
+  --chart-4: oklch(0.72 0.17 320);
+  --chart-5: oklch(0.78 0.16 155);
 }
 
-/* Optional light theme if .light is ever applied to <html>. */
+/* Optional light theme (not the product default; kept for shadcn parity). */
 .light {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --background: oklch(0.99 0.002 250);
+  --foreground: oklch(0.18 0.004 260);
+  --surface: oklch(1 0 0);
+  --surface-elevated: oklch(0.98 0.002 250);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.18 0.004 260);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --popover-foreground: oklch(0.18 0.004 260);
+  --primary: oklch(0.2 0.005 260);
+  --primary-foreground: oklch(0.98 0.003 250);
+  --secondary: oklch(0.96 0.003 250);
+  --secondary-foreground: oklch(0.2 0.005 260);
+  --muted: oklch(0.96 0.003 250);
+  --muted-foreground: oklch(0.5 0.01 260);
+  --accent: oklch(0.96 0.003 250);
+  --accent-foreground: oklch(0.2 0.005 260);
+  --highlight: oklch(0.72 0.2 130);
+  --highlight-foreground: oklch(0.98 0.02 130);
+  --highlight-muted: oklch(0.72 0.2 130 / 14%);
+  --success: oklch(0.6 0.15 155);
+  --warn: oklch(0.7 0.15 75);
+  --destructive: oklch(0.58 0.22 25);
+  --border: oklch(0.18 0.004 260 / 12%);
+  --input: oklch(0.18 0.004 260 / 18%);
+  --ring: var(--highlight);
 }
 
 @layer base {
@@ -89,9 +155,63 @@
     border-color: var(--color-border);
     outline-color: color-mix(in oklab, var(--color-ring) 50%, transparent);
   }
+
+  html {
+    /* prevent layout jump from scrollbar appearing on route change */
+    scrollbar-gutter: stable;
+  }
+
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Hero numeric display: tabular figures so PR columns line up.
+     Apply via the `.tnum` utility on any weight / 1RM / count. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1, "cv01" 1;
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer utilities {
+  /* Display number sizes — the visual heroes of the app. */
+  .text-display-sm {
+    font-size: var(--text-display-sm);
+    line-height: 1;
+    letter-spacing: -0.025em;
+  }
+  .text-display-md {
+    font-size: var(--text-display-md);
+    line-height: 0.95;
+    letter-spacing: -0.03em;
+  }
+  .text-display-lg {
+    font-size: var(--text-display-lg);
+    line-height: 0.92;
+    letter-spacing: -0.035em;
+  }
+  .text-display-xl {
+    font-size: var(--text-display-xl);
+    line-height: 0.9;
+    letter-spacing: -0.04em;
+  }
+}
+
+/* Reduced motion: collapse movement-based animation to instant.
+   Component-level guards (useReducedMotion) handle JS-driven motion;
+   this is the CSS backstop. Opacity-only transitions are kept. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
 }
