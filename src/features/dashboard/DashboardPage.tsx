@@ -13,6 +13,7 @@ import { epley1rm } from '@/analytics/epley';
 import { createCatalog } from '@/parser/catalog';
 import { formatWeight } from '@/lib/units';
 import type { ExerciseBest, Workout } from '@/types/models';
+import { ClearAllDataButton, TrySampleDataButton } from '@/features/data/DataActions';
 import { SplitHistoryStrip } from './SplitHistoryStrip';
 import { LiftSelect } from './LiftSelect';
 
@@ -117,14 +118,17 @@ export default function DashboardPage() {
         <EmptyState
           icon={Dumbbell}
           title="No workouts yet"
-          description="Import your training notes — screenshots or pasted text — and your all-time bests, est. 1RMs, and progression charts will appear here."
+          description="Import your training notes — screenshots or pasted text — and your all-time bests, est. 1RMs, and progression charts will appear here. Or load a few demo workouts to look around first."
           action={
-            <Button asChild>
-              <Link to="/import">
-                <Upload className="size-4" strokeWidth={1.75} />
-                Import your notes
-              </Link>
-            </Button>
+            <div className="flex flex-col items-center gap-3 sm:flex-row">
+              <Button asChild>
+                <Link to="/import">
+                  <Upload className="size-4" strokeWidth={1.75} />
+                  Import your notes
+                </Link>
+              </Button>
+              <TrySampleDataButton variant="outline" />
+            </div>
           }
         />
       </div>
@@ -253,6 +257,18 @@ export default function DashboardPage() {
             <SplitHistoryStrip blocks={blocks} />
           </section>
         ) : null}
+
+        {/* Data controls — quiet, at the bottom. On-device only, so reset
+            lives here rather than competing with the page title. */}
+        <section
+          aria-label="Data"
+          className="flex flex-col gap-3 border-t border-border pt-6 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <p className="text-xs text-muted-foreground">
+            All of this lives in this browser only. Nothing is uploaded.
+          </p>
+          <ClearAllDataButton />
+        </section>
       </div>
     </div>
   );
