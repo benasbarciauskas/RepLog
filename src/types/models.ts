@@ -28,6 +28,7 @@ export interface ExerciseDef {
 export interface SetEntry {
   weightKg: number | null;    // null = bodyweight / unspecified
   reps: number;
+  rpe?: number | null;        // optional rate of perceived exertion (6–10)
   isWarmup?: boolean;
   isFailure?: boolean;
   raw: string;                // original token, e.g. '105x5'
@@ -99,3 +100,64 @@ export interface ParsedWorkout {
   exercises: WorkoutExercise[];
 }
 export interface ParseResult { workouts: ParsedWorkout[]; warnings: string[] }
+
+// ---------------------------------------------------------------------------
+// v1.1 live logger (Strong-style). The active session is the mutable,
+// in-progress workout; on finish it's converted to an immutable `Workout`.
+// Kept separate from `Workout`/`SetEntry` so logging-in-progress rows can be
+// partial (null weight/reps) without weakening the saved data model.
+// ---------------------------------------------------------------------------
+
+/** One editable set row in a live workout. `done` toggles it into the saved set. */
+export interface ActiveSet {
+  id: string;
+  weightKg: number | null;
+  reps: number | null;
+  rpe?: number | null;
+  isWarmup?: boolean;
+  done: boolean;
+}
+
+/** One exercise within a live workout, with its own ordered set rows. */
+export interface ActiveExercise {
+  id: string;
+  exerciseId: string;         // catalog id, or 'unknown:<slug>' if uncatalogued
+  rawName: string;
+  unit: Unit;
+  sets: ActiveSet[];
+  restSeconds?: number;       // per-exercise rest-timer default (falls back to AppSettings)
+  note?: string;
+}
+
+/** The single in-progress workout, persisted so it survives refresh. */
+export interface ActiveSession {
+  id: string;
+  startedAt: string;          // ISO datetime
+  routineId?: string | null;  // set when started from a routine
+  bodyweightKg?: number | null;
+  splitCanonical?: SplitCanonical;
+  exercises: ActiveExercise[];
+}
+
+/** A reusable template a session can be started from. */
+export interface Routine {
+  id: string;
+  name: string;
+  exercises: {
+    exerciseId: string;
+    rawName: string;
+    targetSets: number;
+    targetReps?: number;
+    restSeconds?: number;
+  }[];
+  createdAt: string;          // ISO datetime
+  updatedAt: string;          // ISO datetime
+}
+
+/** App-wide preferences for the logger (bar/plate config, rest, display unit). */
+export interface AppSettings {
+  barWeightKg: number;
+  availablePlatesKg: number[];
+  defaultRestSeconds: number;
+  unit: Unit;
+}
