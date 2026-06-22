@@ -24,6 +24,8 @@ import type { NoteSource, RawNote } from '@/types/models';
 import { imageToText } from '@/ocr/ocr';
 import { stitchOcrText } from '@/ocr/stitch';
 import { VideoDecodeError, videoToFrames } from '@/ocr/video';
+import { useWorkouts } from '@/data/hooks';
+import { TrySampleDataButton } from '@/features/data/DataActions';
 import { ingestCorpus } from './pipeline';
 import { REVIEW_STATE_TAG, type ReviewRouteState } from './types';
 
@@ -43,6 +45,7 @@ const IDLE: ProgressState = { value: null, label: '' };
 export default function ImportPage() {
   const navigate = useNavigate();
   const reduce = useReducedMotion();
+  const workouts = useWorkouts();
 
   const [mode, setMode] = useState<Mode>('screenshots');
   const [images, setImages] = useState<File[]>([]);
@@ -263,6 +266,17 @@ export default function ImportPage() {
           <ParseButton mode={mode} busy={busy} reduce={reduce} onClick={runForMode(mode, { parseScreenshots, parsePaste, parseVideo })} disabled={isDisabled(mode, { images, pasteText, videoFile, busy })} />
         </div>
       </div>
+
+      {/* First-run shortcut: when there's nothing logged yet, let people load a
+          few demo workouts to see the dashboard and coach before importing. */}
+      {workouts.length === 0 ? (
+        <div className="mt-8 flex flex-col items-center gap-2 border-t border-border pt-6 text-center">
+          <p className="text-sm text-muted-foreground">
+            Just want to look around first?
+          </p>
+          <TrySampleDataButton variant="outline" />
+        </div>
+      ) : null}
     </div>
   );
 }
