@@ -1,0 +1,7 @@
+{
+  "name": "replog",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Turn messy workout notes into a coach — on-device parser + strength-imbalance analysis."
+}
