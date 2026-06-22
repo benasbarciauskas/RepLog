@@ -14,6 +14,14 @@ vi.mock('@/data/hooks', () => ({
   useBlocks: () => [],
   useBodyweightSeries: () => [],
   useCoachFindings: () => [],
+  // Exercise + History read settings (for display unit). Default settings are
+  // fine for the shell-mount test.
+  useSettings: () => ({
+    barWeightKg: 20,
+    availablePlatesKg: [25, 20, 15, 10, 5, 2.5, 1.25],
+    defaultRestSeconds: 120,
+    unit: 'kg' as const,
+  }),
 }));
 
 // Render the shell at a given route. App provides no Router, so we wrap it.
