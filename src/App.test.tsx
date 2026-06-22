@@ -4,8 +4,10 @@ import { MemoryRouter } from 'react-router-dom';
 
 // Mock the data layer so the shell renders without IndexedDB.
 const useWorkoutsMock = vi.fn<() => unknown[]>(() => []);
+const useWorkoutCountMock = vi.fn<() => number | undefined>(() => 0);
 vi.mock('@/data/hooks', () => ({
   useWorkouts: () => useWorkoutsMock(),
+  useWorkoutCount: () => useWorkoutCountMock(),
   // Dashboard + Coach (rendered at "/" and "/coach") also read these; the shell
   // test only cares that the page mounts, so empty arrays are enough.
   useBests: () => [],
@@ -28,6 +30,8 @@ afterEach(() => {
   cleanup();
   useWorkoutsMock.mockReset();
   useWorkoutsMock.mockReturnValue([]);
+  useWorkoutCountMock.mockReset();
+  useWorkoutCountMock.mockReturnValue(0);
   localStorage.clear();
 });
 
@@ -52,7 +56,7 @@ describe('App shell', () => {
   });
 
   it('redirects "/" to Import when there are no workouts', async () => {
-    useWorkoutsMock.mockReturnValue([]);
+    useWorkoutCountMock.mockReturnValue(0);
     await renderApp('/');
     // <Navigate> resolves on a later tick — wait for the page heading.
     expect(
@@ -61,7 +65,7 @@ describe('App shell', () => {
   });
 
   it('shows the Dashboard at "/" when workouts exist', async () => {
-    useWorkoutsMock.mockReturnValue([{ id: 'w1' }]);
+    useWorkoutCountMock.mockReturnValue(1);
     await renderApp('/');
     expect(
       await screen.findByRole('heading', { name: 'Dashboard', level: 1 }),

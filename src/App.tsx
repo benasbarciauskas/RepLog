@@ -6,7 +6,7 @@ import { Sidebar, BottomNav, MobileTopBar } from '@/components/AppNav';
 import { PageTransition } from '@/components/PageTransition';
 import { RouteFallback } from '@/components/RouteFallback';
 import { Onboarding } from '@/features/onboarding/Onboarding';
-import { useWorkouts } from '@/data/hooks';
+import { useWorkoutCount } from '@/data/hooks';
 
 // Routes are code-split: each page (and its heavy deps — recharts, chrono,
 // fuse, tesseract) loads only when that route is first visited, keeping the
@@ -22,8 +22,13 @@ const CoachPage = lazy(() => import('@/features/coach/CoachPage'));
  * first-time user to Import. Onboarding renders on top for genuine first runs.
  */
 function HomeRoute() {
-  const workouts = useWorkouts();
-  if (workouts.length === 0) return <Navigate to="/import" replace />;
+  // `count` is undefined until the live query resolves. Only redirect once we
+  // KNOW the count is zero — otherwise the dashboard flash-redirects to Import
+  // on every fresh load before IndexedDB answers (the live query's initial
+  // value would read as "empty").
+  const count = useWorkoutCount();
+  if (count === undefined) return <RouteFallback />;
+  if (count === 0) return <Navigate to="/import" replace />;
   return <DashboardPage />;
 }
 
