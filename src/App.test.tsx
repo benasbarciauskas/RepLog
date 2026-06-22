@@ -14,9 +14,8 @@ vi.mock('@/data/hooks', () => ({
   useBlocks: () => [],
   useBodyweightSeries: () => [],
   useCoachFindings: () => [],
-  // Logger (/log) + Routines (/routines) read these. No active session and no
-  // saved routines is enough for the shell smoke test (they render the start /
-  // empty views, which still mount the page header heading).
+  // Logger (/log) + Routines (/routines) read these; Exercise + History read
+  // settings (display unit). Empties/defaults are enough for the shell-mount test.
   useActiveSession: () => undefined,
   useRoutines: () => [],
   useSettings: () => ({

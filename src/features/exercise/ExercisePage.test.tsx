@@ -1,14 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import type { ExerciseBest, Workout } from '@/types/models';
+import type { AppSettings, ExerciseBest, Workout } from '@/types/models';
 
 const workoutsMock = vi.fn<() => Workout[]>(() => []);
 const bestsMock = vi.fn<() => ExerciseBest[]>(() => []);
+const DEFAULT_SETTINGS: AppSettings = {
+  barWeightKg: 20,
+  availablePlatesKg: [25, 20, 15, 10, 5, 2.5, 1.25],
+  defaultRestSeconds: 120,
+  unit: 'kg',
+};
+const settingsMock = vi.fn<() => AppSettings>(() => DEFAULT_SETTINGS);
 
 vi.mock('@/data/hooks', () => ({
   useWorkouts: () => workoutsMock(),
   useBests: () => bestsMock(),
+  useSettings: () => settingsMock(),
 }));
 
 async function renderExercise(id: string) {
@@ -79,6 +87,7 @@ const benchWorkouts: Workout[] = [
 beforeEach(() => {
   workoutsMock.mockReturnValue([]);
   bestsMock.mockReturnValue([]);
+  settingsMock.mockReturnValue(DEFAULT_SETTINGS);
 });
 
 afterEach(() => {
@@ -102,17 +111,34 @@ describe('ExercisePage', { timeout: 20000 }, () => {
     expect(screen.getByText(/works .*chest/i)).toBeInTheDocument();
   });
 
-  it('renders the progression chart and PR history for a lift with data', async () => {
+  it('renders the progression chart, session history, and PR history for a lift with data', async () => {
     workoutsMock.mockReturnValue(benchWorkouts);
     bestsMock.mockReturnValue([benchBest]);
 
     await renderExercise('barbell-bench-press');
 
     expect(screen.getByRole('heading', { name: /progression/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /session history/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /pr history/i })).toBeInTheDocument();
     // PR rows render their rep counts.
     expect(screen.getByText(/× 3 reps/)).toBeInTheDocument();
     expect(screen.getByText(/× 5 reps/)).toBeInTheDocument();
+    // Default metric is Est. 1RM → chart card titled accordingly.
+    expect(screen.getByText('Estimated 1RM')).toBeInTheDocument();
+  });
+
+  it('switches the charted series when the metric toggle changes', async () => {
+    workoutsMock.mockReturnValue(benchWorkouts);
+    bestsMock.mockReturnValue([benchBest]);
+
+    await renderExercise('barbell-bench-press');
+
+    // Default chart card shows the Est. 1RM metric.
+    expect(screen.getByText('Estimated 1RM')).toBeInTheDocument();
+
+    // Pick "Heaviest" from the metric toggle → chart card retitles.
+    fireEvent.click(screen.getByRole('tab', { name: 'Heaviest' }));
+    expect(screen.getByText('Heaviest weight')).toBeInTheDocument();
   });
 
   it('handles an unknown id gracefully (no data state, no crash)', async () => {

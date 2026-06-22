@@ -1,15 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import type { CoachFinding, Workout } from '@/types/models';
+import type { CoachFinding, ExerciseBest, Workout } from '@/types/models';
 
 const workoutsMock = vi.fn<() => Workout[]>(() => []);
 const findingsMock = vi.fn<() => CoachFinding[]>(() => []);
+const bestsMock = vi.fn<() => ExerciseBest[]>(() => []);
 
-// muscleCoverage is intentionally NOT mocked — the page calls the real engine.
+// muscleCoverage + balanceScore are intentionally NOT mocked — the page calls
+// the real engines.
 vi.mock('@/data/hooks', () => ({
   useWorkouts: () => workoutsMock(),
   useCoachFindings: () => findingsMock(),
+  useBests: () => bestsMock(),
 }));
 
 async function renderCoach() {
@@ -21,16 +24,33 @@ async function renderCoach() {
   );
 }
 
+/** ExerciseBest with just an e1RM (what balanceScore reads). */
+function best(exerciseId: string, e1rm: number): ExerciseBest {
+  return {
+    exerciseId,
+    maxWeightKg: e1rm,
+    maxWeightDate: '2023-07-10',
+    bestE1rmKg: e1rm,
+    bestE1rmDate: '2023-07-10',
+    repPRs: [],
+  };
+}
+
 const priorityFinding: CoachFinding = {
   ruleId: 'ohp-bench',
   severity: 'priority',
-  ratio: 0.5,
+  ratio: 0.4,
   message:
-    'You bench 150kg but only overhead press 75kg (0.50, healthy ≥0.60) — your overhead press is low for your bench press; front delts likely lagging.',
+    'You bench 150kg but only overhead press 60kg (0.40, healthy ≥0.60) — your overhead press is low for your bench press; front delts likely lagging.',
   muscles: ['front-delts', 'triceps'],
 };
 
-// A workout using a catalogued id the coverage map knows (bench → chest etc.)
+// Bench + OHP both present so balanceScore can fire ohp-bench.
+const scorableBests: ExerciseBest[] = [
+  best('barbell-bench-press', 150),
+  best('overhead-press', 60),
+];
+
 const benchWorkout: Workout = {
   id: 'w1',
   date: '2023-07-10',
@@ -57,6 +77,7 @@ const benchWorkout: Workout = {
 beforeEach(() => {
   workoutsMock.mockReturnValue([]);
   findingsMock.mockReturnValue([]);
+  bestsMock.mockReturnValue([]);
 });
 
 afterEach(() => {
@@ -64,40 +85,58 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-// Generous timeout: motion + page transforms can blow the 5s default on a cold
-// cache under parallel workers on slower machines/CI.
+// Generous timeout: motion + gauges can blow the 5s default on a cold cache
+// under parallel workers on slower machines/CI.
 describe('CoachPage', { timeout: 20000 }, () => {
-  it('renders an encouraging empty state with an import CTA when there is no data', async () => {
+  it('renders an encouraging empty state with CTAs when there is no data', async () => {
     await renderCoach();
-    expect(screen.getByRole('heading', { name: /nothing to analyze yet/i })).toBeInTheDocument();
-    expect(screen.getByText(/front-delt analysis/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: /nothing to score yet/i }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /import your notes/i })).toHaveAttribute(
       'href',
       '/import',
     );
   });
 
-  it('renders a priority finding card spelling out the comparison + ratio', async () => {
+  it('prompts for more lifts when data exists but no ratio can be scored', async () => {
+    // Only bench logged → no pair → overall is null.
     workoutsMock.mockReturnValue([benchWorkout]);
+    bestsMock.mockReturnValue([best('barbell-bench-press', 150)]);
+
+    await renderCoach();
+    expect(
+      screen.getByRole('heading', { name: /log one more lift/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('shows the Balance Score ring and a recommendation card with scorable data', async () => {
+    workoutsMock.mockReturnValue([benchWorkout]);
+    bestsMock.mockReturnValue(scorableBests);
     findingsMock.mockReturnValue([priorityFinding]);
 
     await renderCoach();
 
-    // Severity label + ratio chip.
-    expect(screen.getByText('Priority')).toBeInTheDocument();
-    expect(screen.getByText(/ratio 0\.50/)).toBeInTheDocument();
-    // The full antagonist comparison message renders verbatim.
+    // The headline score ring is present (accessible img with a Balance Score label).
     expect(
-      screen.getByText(/you bench 150kg but only overhead press 75kg/i),
+      screen.getByRole('img', { name: /balance score \d+ out of 100/i }),
     ).toBeInTheDocument();
-    // Focus-on summary surfaces the affected muscle.
-    const focus = screen.getByRole('region', { name: /focus on/i });
-    expect(focus).toHaveTextContent(/front delts/i);
+
+    // Recommendation section + the priority card spelling out the comparison.
+    expect(
+      screen.getByRole('heading', { name: /do this to improve/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Priority')).toBeInTheDocument();
+    expect(screen.getByText(/ratio 0\.40/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/you bench 150kg but only overhead press 60kg/i),
+    ).toBeInTheDocument();
   });
 
   it('renders a muscle-coverage view (never-trained groups) from real coverage', async () => {
     // Only bench is logged → legs/back muscles are "never".
     workoutsMock.mockReturnValue([benchWorkout]);
+    bestsMock.mockReturnValue(scorableBests);
     findingsMock.mockReturnValue([]);
 
     await renderCoach();

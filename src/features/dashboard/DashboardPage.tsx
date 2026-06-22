@@ -1,21 +1,34 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, useReducedMotion } from 'motion/react';
-import { Dumbbell, LineChart, Scale, Trophy, Upload } from 'lucide-react';
+import {
+  ArrowUpRight,
+  CalendarDays,
+  Dumbbell,
+  Flame,
+  LineChart,
+  type LucideProps,
+  Scale,
+  Trophy,
+  Upload,
+} from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { StatCard } from '@/components/StatCard';
 import { LineChartCard } from '@/components/charts/LineChartCard';
 import { AreaChartCard } from '@/components/charts/AreaChartCard';
+import { RingGauge, type GaugeTone } from '@/components/charts/RingGauge';
 import { Button } from '@/components/ui/button';
 import { useBests, useBlocks, useBodyweightSeries, useWorkouts } from '@/data/hooks';
 import { epley1rm } from '@/analytics/epley';
+import { balanceScore, overallLabel } from '@/coach/score';
 import { createCatalog } from '@/parser/catalog';
 import { formatWeight } from '@/lib/units';
 import type { ExerciseBest, Workout } from '@/types/models';
 import { ClearAllDataButton, TrySampleDataButton } from '@/features/data/DataActions';
 import { SplitHistoryStrip } from './SplitHistoryStrip';
 import { LiftSelect } from './LiftSelect';
+import { dashboardStats } from './stats';
 
 const EASE_OUT: [number, number, number, number] = [0.23, 1, 0.32, 1];
 
@@ -98,6 +111,9 @@ export default function DashboardPage() {
 
   const loaded = useMemo(() => rankedBests(bests), [bests]);
 
+  const score = useMemo(() => balanceScore(bests), [bests]);
+  const stats = useMemo(() => dashboardStats(workouts, bests), [workouts, bests]);
+
   // Lift selector for the PR timeline — default to the strongest lift.
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const timelineId = selectedId ?? loaded[0]?.exerciseId ?? null;
@@ -144,6 +160,106 @@ export default function DashboardPage() {
       />
 
       <div className="space-y-10">
+        {/* Balance Score hero + progress cards */}
+        <section
+          aria-labelledby="overview-heading"
+          className="grid grid-cols-1 gap-4 lg:grid-cols-[auto_1fr] lg:items-stretch"
+        >
+          <h2 id="overview-heading" className="sr-only">
+            Overview
+          </h2>
+
+          {/* Balance Score ring → links to the coach */}
+          <motion.div
+            initial={reduce ? false : { opacity: 0, y: 8 }}
+            whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.3 }}
+            transition={{ duration: 0.3, ease: EASE_OUT }}
+          >
+            <Link
+              to="/coach"
+              className="group flex h-full flex-col items-center justify-center gap-3 rounded-xl border border-border bg-card p-6 text-center shadow-sm transition-colors hover:border-highlight/40 hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            >
+              {score.overall != null ? (
+                <>
+                  <RingGauge
+                    value={score.overall}
+                    size={140}
+                    tone={scoreTone(score.overall)}
+                    label="Balance"
+                    ariaLabel={`Balance Score ${score.overall} out of 100`}
+                  />
+                  <span className="text-sm font-medium text-muted-foreground">
+                    {overallLabel(score.overall)}
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-highlight">
+                    Open coach
+                    <ArrowUpRight className="size-3.5" strokeWidth={2} />
+                  </span>
+                </>
+              ) : (
+                <>
+                  <RingGauge value={0} size={140} tone="muted" showValue={false} label="Balance">
+                    <span className="text-2xl font-semibold text-muted-foreground">—</span>
+                  </RingGauge>
+                  <span className="max-w-[12rem] text-xs text-muted-foreground">
+                    Log two comparable lifts to unlock your Balance Score.
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-highlight">
+                    Open coach
+                    <ArrowUpRight className="size-3.5" strokeWidth={2} />
+                  </span>
+                </>
+              )}
+            </Link>
+          </motion.div>
+
+          {/* Progress cards */}
+          <div className="grid grid-cols-2 gap-4">
+            <ProgressCard
+              label="This week"
+              value={stats.thisWeekVolumeKg}
+              suffix=" kg"
+              decimals={stats.thisWeekVolumeKg % 1 === 0 ? 0 : 1}
+              hint={
+                stats.weeklyVolumeDeltaPct != null
+                  ? `${stats.weeklyVolumeDeltaPct >= 0 ? '+' : ''}${stats.weeklyVolumeDeltaPct}% vs last week`
+                  : 'Volume lifted'
+              }
+              icon={LineChart}
+              index={0}
+              reduce={Boolean(reduce)}
+            />
+            <ProgressCard
+              label="Streak"
+              value={stats.streakWeeks}
+              suffix={stats.streakWeeks === 1 ? ' wk' : ' wks'}
+              hint="Consecutive weeks trained"
+              tone="highlight"
+              icon={Flame}
+              index={1}
+              reduce={Boolean(reduce)}
+            />
+            <ProgressCard
+              label="This month"
+              value={stats.workoutsThisMonth}
+              hint={stats.workoutsThisMonth === 1 ? 'Workout logged' : 'Workouts logged'}
+              icon={CalendarDays}
+              index={2}
+              reduce={Boolean(reduce)}
+            />
+            <ProgressCard
+              label="PRs this month"
+              value={stats.prsThisPeriod}
+              hint="In the last 30 days"
+              tone="highlight"
+              icon={Trophy}
+              index={3}
+              reduce={Boolean(reduce)}
+            />
+          </div>
+        </section>
+
         {/* All-time bests grid */}
         <section aria-labelledby="bests-heading">
           <SectionTitle id="bests-heading" icon={Trophy}>
@@ -271,6 +387,54 @@ export default function DashboardPage() {
         </section>
       </div>
     </div>
+  );
+}
+
+/** Balance Score → ring tone (acid-lime only for strong). */
+function scoreTone(score: number): GaugeTone {
+  if (score >= 75) return 'highlight';
+  if (score >= 50) return 'warn';
+  return 'destructive';
+}
+
+function ProgressCard({
+  label,
+  value,
+  suffix,
+  decimals = 0,
+  hint,
+  tone = 'default',
+  icon,
+  index,
+  reduce,
+}: {
+  label: string;
+  value: number;
+  suffix?: string;
+  decimals?: number;
+  hint?: string;
+  tone?: 'default' | 'highlight';
+  icon: React.ComponentType<LucideProps>;
+  index: number;
+  reduce: boolean;
+}) {
+  return (
+    <motion.div
+      initial={reduce ? false : { opacity: 0, y: 8 }}
+      whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.3 }}
+      transition={{ duration: 0.28, ease: EASE_OUT, delay: Math.min(index, 4) * 0.04 }}
+    >
+      <StatCard
+        label={label}
+        value={value}
+        suffix={suffix}
+        decimals={decimals}
+        tone={tone}
+        icon={icon}
+        hint={hint}
+      />
+    </motion.div>
   );
 }
 
