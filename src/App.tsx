@@ -1,17 +1,21 @@
-import { Suspense } from 'react';
+import { lazy, Suspense } from 'react';
 import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { AnimatePresence } from 'motion/react';
 import { Toaster } from '@/components/ui/sonner';
 import { Sidebar, BottomNav, MobileTopBar } from '@/components/AppNav';
 import { PageTransition } from '@/components/PageTransition';
+import { RouteFallback } from '@/components/RouteFallback';
 import { Onboarding } from '@/features/onboarding/Onboarding';
 import { useWorkouts } from '@/data/hooks';
 
-import DashboardPage from '@/features/dashboard/DashboardPage';
-import ImportPage from '@/features/import/ImportPage';
-import ReviewPage from '@/features/review/ReviewPage';
-import ExercisePage from '@/features/exercise/ExercisePage';
-import CoachPage from '@/features/coach/CoachPage';
+// Routes are code-split: each page (and its heavy deps — recharts, chrono,
+// fuse, tesseract) loads only when that route is first visited, keeping the
+// initial bundle small. The Suspense fallback below covers the chunk fetch.
+const DashboardPage = lazy(() => import('@/features/dashboard/DashboardPage'));
+const ImportPage = lazy(() => import('@/features/import/ImportPage'));
+const ReviewPage = lazy(() => import('@/features/review/ReviewPage'));
+const ExercisePage = lazy(() => import('@/features/exercise/ExercisePage'));
+const CoachPage = lazy(() => import('@/features/coach/CoachPage'));
 
 /**
  * Root route ('/'): the dashboard once there are workouts, otherwise send the
@@ -51,7 +55,7 @@ export default function App() {
           bottom tab bar on mobile. Capped width for comfortable line lengths. */}
       <div className="md:pl-60">
         <main className="mx-auto w-full max-w-5xl px-4 pb-24 pt-6 sm:px-6 md:pb-10 md:pt-10">
-          <Suspense fallback={null}>
+          <Suspense fallback={<RouteFallback />}>
             <AnimatedRoutes />
           </Suspense>
         </main>

@@ -10,6 +10,7 @@ node_modules/
 dist/
 dist-ssr/
 build/
+dev-dist/
 *.local
 
 # Vite / cache
