@@ -78,4 +78,36 @@ describe('App shell', () => {
       await screen.findByRole('heading', { name: 'Coach', level: 1 }),
     ).toBeInTheDocument();
   });
+
+  it('renders the Log placeholder at /log', async () => {
+    await renderApp('/log');
+    expect(
+      await screen.findByRole('heading', { name: 'Log', level: 1 }),
+    ).toBeInTheDocument();
+  });
+
+  it('renders the Routines placeholder at /routines', async () => {
+    await renderApp('/routines');
+    expect(
+      await screen.findByRole('heading', { name: 'Routines', level: 1 }),
+    ).toBeInTheDocument();
+  });
+
+  it('renders the History placeholder at /history', async () => {
+    await renderApp('/history');
+    expect(
+      await screen.findByRole('heading', { name: 'History', level: 1 }),
+    ).toBeInTheDocument();
+  });
+
+  it('exposes the Log primary nav entry', async () => {
+    await renderApp('/import');
+    const navs = screen.getAllByRole('navigation');
+    const labels = navs.flatMap((nav) =>
+      within(nav)
+        .queryAllByRole('link')
+        .map((l) => l.textContent),
+    );
+    expect(labels.join(' ')).toMatch(/Log/);
+  });
 });
