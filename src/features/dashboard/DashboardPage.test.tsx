@@ -124,6 +124,21 @@ describe('DashboardPage', { timeout: 20000 }, () => {
     expect(screen.getByRole('heading', { name: /pr timeline/i })).toBeInTheDocument();
   });
 
+  it('renders the progress cards (streak, this month) with seeded data', async () => {
+    workoutsMock.mockReturnValue(seededWorkouts);
+    bestsMock.mockReturnValue([benchBest]);
+
+    await renderDashboard();
+    // Progress cards present.
+    expect(screen.getByText('This week')).toBeInTheDocument();
+    expect(screen.getByText('Streak')).toBeInTheDocument();
+    expect(screen.getByText('This month')).toBeInTheDocument();
+    // The Balance Score block links to the coach (single comparable pair → may be
+    // unlocked or not, but the "Open coach" affordance always renders).
+    const coachLinks = screen.getAllByRole('link', { name: /open coach/i });
+    expect(coachLinks[0]).toHaveAttribute('href', '/coach');
+  });
+
   it('renders the split-history strip when blocks exist', async () => {
     workoutsMock.mockReturnValue(seededWorkouts);
     bestsMock.mockReturnValue([benchBest]);
