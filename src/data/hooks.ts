@@ -1,13 +1,17 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from './db';
+import { ACTIVE_SESSION_KEY, db, SETTINGS_KEY } from './db';
+import { DEFAULT_SETTINGS, stripSettingsKey } from './repository';
 import { computeBests } from '@/analytics/bests';
 import { inferBlocks } from '@/analytics/blocks';
 import { bodyweightSeries } from '@/analytics/bodyweight';
 import { analyzeImbalances } from '@/coach/analyze';
 import type {
+  ActiveSession,
+  AppSettings,
   CoachFinding,
   ExerciseBest,
   RawNote,
+  Routine,
   TrainingBlock,
   Workout,
 } from '@/types/models';
@@ -54,4 +58,37 @@ export function useBlocks(): TrainingBlock[] {
 /** Bodyweight-over-time series for the trend chart, live. */
 export function useBodyweightSeries(): { date: string; kg: number }[] {
   return useLiveQuery(async () => bodyweightSeries(await db.workouts.toArray()), [], []);
+}
+
+// --- v1.1 live logger --------------------------------------------------------
+
+/**
+ * The in-progress workout, live. `undefined` means either "still loading" or
+ * "no active session" — distinguish by treating the first resolved `undefined`
+ * as no session (the third arg seeds the initial value before the query runs).
+ */
+export function useActiveSession(): ActiveSession | undefined {
+  return useLiveQuery(() => db.activeSession.get(ACTIVE_SESSION_KEY), [], undefined);
+}
+
+/** Live list of saved routines, most-recently-updated first. */
+export function useRoutines(): Routine[] {
+  return useLiveQuery(
+    () => db.routines.orderBy('updatedAt').reverse().toArray(),
+    [],
+    [],
+  );
+}
+
+/** Live logger settings, falling back to defaults until/unless persisted. */
+export function useSettings(): AppSettings {
+  return useLiveQuery(
+    async () => {
+      const stored = await db.settings.get(SETTINGS_KEY);
+      if (!stored) return { ...DEFAULT_SETTINGS };
+      return stripSettingsKey(stored);
+    },
+    [],
+    DEFAULT_SETTINGS,
+  );
 }

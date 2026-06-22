@@ -1,7 +1,10 @@
 import {
   LayoutDashboard,
-  Upload,
+  Dumbbell,
   Target,
+  Upload,
+  ListChecks,
+  History,
   ClipboardCheck,
   type LucideProps,
 } from 'lucide-react';
@@ -17,12 +20,22 @@ export interface NavItem {
 
 /**
  * Navigation model. `primary` items appear in the mobile bottom tab bar;
- * the rest stay reachable from the desktop sidebar (Review is also reached
- * from the import flow). Exported so page agents can reference the route map.
+ * the rest stay reachable from the desktop sidebar and an "More" overflow sheet
+ * on mobile. Exported so page agents can reference the route map.
+ *
+ * Mobile primary tabs (4 + a centred Log action): Dashboard, Coach, [Log],
+ * History, More. Log gets the prominent centre slot (the core v1.1 action).
+ * Import, Routines and Review live in the desktop sidebar / mobile overflow.
  */
 export const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, primary: true },
-  { to: '/import', label: 'Import', icon: Upload, primary: true },
+  { to: '/log', label: 'Log', icon: Dumbbell, primary: true },
   { to: '/coach', label: 'Coach', icon: Target, primary: true },
+  { to: '/history', label: 'History', icon: History, primary: true },
+  { to: '/routines', label: 'Routines', icon: ListChecks, primary: false },
+  { to: '/import', label: 'Import', icon: Upload, primary: false },
   { to: '/review', label: 'Review', icon: ClipboardCheck, primary: false },
 ];
+
+/** The route that gets the prominent centre slot in the mobile bottom nav. */
+export const PRIMARY_ACTION_TO = '/log';

@@ -16,6 +16,9 @@ const ImportPage = lazy(() => import('@/features/import/ImportPage'));
 const ReviewPage = lazy(() => import('@/features/review/ReviewPage'));
 const ExercisePage = lazy(() => import('@/features/exercise/ExercisePage'));
 const CoachPage = lazy(() => import('@/features/coach/CoachPage'));
+const LoggerPage = lazy(() => import('@/features/logger/LoggerPage'));
+const RoutinesPage = lazy(() => import('@/features/routines/RoutinesPage'));
+const HistoryPage = lazy(() => import('@/features/history/HistoryPage'));
 
 /**
  * Root route ('/'): the dashboard once there are workouts, otherwise send the
@@ -43,6 +46,9 @@ function AnimatedRoutes() {
           <Route path="/review" element={<ReviewPage />} />
           <Route path="/exercise/:id" element={<ExercisePage />} />
           <Route path="/coach" element={<CoachPage />} />
+          <Route path="/log" element={<LoggerPage />} />
+          <Route path="/routines" element={<RoutinesPage />} />
+          <Route path="/history" element={<HistoryPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </PageTransition>
