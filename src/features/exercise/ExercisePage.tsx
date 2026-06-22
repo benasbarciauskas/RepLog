@@ -1,17 +1,27 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { motion, useReducedMotion } from 'motion/react';
-import { ArrowLeft, Dumbbell, LineChart, Trophy } from 'lucide-react';
+import { ArrowLeft, Dumbbell, LineChart, ListOrdered, Trophy } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { StatCard } from '@/components/StatCard';
 import { LineChartCard } from '@/components/charts/LineChartCard';
 import { Button } from '@/components/ui/button';
-import { useBests, useWorkouts } from '@/data/hooks';
-import { epley1rm } from '@/analytics/epley';
+import { useBests, useSettings, useWorkouts } from '@/data/hooks';
 import { createCatalog } from '@/parser/catalog';
 import { formatWeight } from '@/lib/units';
-import type { MuscleGroup, RepPR, Workout } from '@/types/models';
+import type { MuscleGroup, RepPR } from '@/types/models';
+import { SegmentedControl } from './SegmentedControl';
+import {
+  METRICS,
+  RANGES,
+  filterByRange,
+  metricSeries,
+  sessionHistory,
+  type MetricKey,
+  type RangeKey,
+  type SessionSet,
+} from './progress';
 
 const EASE_OUT: [number, number, number, number] = [0.23, 1, 0.32, 1];
 
@@ -34,44 +44,18 @@ function humanMuscle(m: MuscleGroup): string {
   return m.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-/**
- * Per-session top-set weight + best est-1RM for one exercise, chronological.
- * Warmups excluded; bodyweight-only sets skipped from the loaded series.
- */
-function progressionSeries(
-  workouts: Workout[],
-  exerciseId: string,
-): { date: string; topSet: number; e1rm: number }[] {
-  const series: { date: string; topSet: number; e1rm: number }[] = [];
-  for (const w of workouts) {
-    let topSet = 0;
-    let bestE1rm = 0;
-    for (const ex of w.exercises) {
-      if (ex.exerciseId !== exerciseId) continue;
-      for (const s of ex.sets) {
-        if (s.isWarmup || s.weightKg == null) continue;
-        if (s.weightKg > topSet) topSet = s.weightKg;
-        const e = epley1rm(s.weightKg, s.reps);
-        if (e > bestE1rm) bestE1rm = e;
-      }
-    }
-    if (topSet > 0) {
-      series.push({
-        date: w.date,
-        topSet: Math.round(topSet * 10) / 10,
-        e1rm: Math.round(bestE1rm * 10) / 10,
-      });
-    }
-  }
-  return series;
-}
-
 export default function ExercisePage() {
   const { id } = useParams<{ id: string }>();
   const workouts = useWorkouts();
   const bests = useBests();
+  const settings = useSettings();
   const navigate = useNavigate();
   const reduce = useReducedMotion();
+
+  const [metric, setMetric] = useState<MetricKey>('e1rm');
+  const [range, setRange] = useState<RangeKey>('all');
+
+  const unit = settings.unit;
 
   const def = useMemo(() => {
     if (!id) return null;
@@ -84,10 +68,27 @@ export default function ExercisePage() {
     [bests, id],
   );
 
+  // Full metric series, then filtered to the selected time range.
+  const fullSeries = useMemo(
+    () => (id ? metricSeries(workouts, id, metric) : []),
+    [workouts, id, metric],
+  );
+  const rangeMonths = RANGES.find((r) => r.key === range)?.months ?? null;
   const series = useMemo(
-    () => (id ? progressionSeries(workouts, id) : []),
+    () => filterByRange(fullSeries, rangeMonths),
+    [fullSeries, rangeMonths],
+  );
+
+  const history = useMemo(
+    () => (id ? sessionHistory(workouts, id) : []),
     [workouts, id],
   );
+  const rangedHistory = useMemo(
+    () => filterByRange(history, rangeMonths),
+    [history, rangeMonths],
+  );
+
+  const metricMeta = METRICS.find((m) => m.key === metric)!;
 
   // Display name: catalog canonical, else de-slugged id.
   const name = useMemo(() => {
@@ -128,7 +129,10 @@ export default function ExercisePage() {
     );
   }
 
-  const hasData = best != null || series.length > 0;
+  const hasData = best != null || history.length > 0;
+  // The chart's series unit follows the metric; reps has no unit.
+  const seriesLabel =
+    metricMeta.unit === 'kg' ? `${metricMeta.short} (${unit})` : metricMeta.short;
 
   return (
     <div>
@@ -138,7 +142,7 @@ export default function ExercisePage() {
         description={
           muscles.length > 0
             ? `Works ${muscles.map(humanMuscle).join(', ')}.`
-            : 'Top-set progression, est. 1RM over time, and your PR history.'
+            : 'Progression by metric, PR history, and every past session.'
         }
         actions={backButton}
       />
@@ -147,7 +151,7 @@ export default function ExercisePage() {
         <EmptyState
           icon={Dumbbell}
           title="No data for this lift yet"
-          description="Once you've logged this exercise, its progression chart and PR history will appear here."
+          description="Once you've logged this exercise, its progression chart and session history will appear here."
           action={
             <Button asChild variant="outline">
               <Link to="/">Back to dashboard</Link>
@@ -196,30 +200,82 @@ export default function ExercisePage() {
             </section>
           ) : null}
 
-          {/* Progression chart */}
+          {/* Progression — metric toggle + range selector drive the chart */}
           <section aria-labelledby="ex-progress-heading">
-            <h2
-              id="ex-progress-heading"
-              className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground"
-            >
-              <LineChart className="size-4 text-highlight" strokeWidth={1.75} />
-              Progression
-            </h2>
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <h2
+                id="ex-progress-heading"
+                className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground"
+              >
+                <LineChart className="size-4 text-highlight" strokeWidth={1.75} />
+                Progression
+              </h2>
+              <SegmentedControl
+                size="compact"
+                ariaLabel="Time range"
+                options={RANGES.map((r) => ({ value: r.key, label: r.label }))}
+                value={range}
+                onChange={setRange}
+              />
+            </div>
+
+            <div className="mb-4">
+              <SegmentedControl
+                ariaLabel="Progression metric"
+                options={METRICS.map((m) => ({ value: m.key, label: m.short }))}
+                value={metric}
+                onChange={setMetric}
+                className="flex-wrap"
+              />
+            </div>
+
             {series.length >= 2 ? (
               <LineChartCard
-                title="Estimated 1RM"
-                description="Best est. 1RM per session over time"
+                title={metricMeta.label}
+                description={`${metricMeta.label} per session over time`}
                 data={series}
                 xKey="date"
-                dataKey="e1rm"
-                seriesLabel="Est. 1RM (kg)"
+                dataKey="value"
+                seriesLabel={seriesLabel}
                 xTickFormatter={(v) => shortDate(String(v))}
               />
             ) : (
               <EmptyState
                 icon={LineChart}
-                title="Not enough history to chart"
-                description="Log this lift across at least two sessions to see your progression."
+                title="Not enough sessions to chart"
+                description="Log this lift across at least two sessions in this range to see the trend. Try widening the time range or switching the metric."
+              />
+            )}
+          </section>
+
+          {/* Per-session set history */}
+          <section aria-labelledby="ex-history-heading">
+            <h2
+              id="ex-history-heading"
+              className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground"
+            >
+              <ListOrdered className="size-4 text-highlight" strokeWidth={1.75} />
+              Session history
+            </h2>
+            {rangedHistory.length > 0 ? (
+              <ol className="space-y-3">
+                {rangedHistory.map((row, i) => (
+                  <SessionCard
+                    key={row.workoutId}
+                    date={row.date}
+                    sets={row.sets}
+                    volumeKg={row.sessionVolumeKg}
+                    unit={unit}
+                    index={i}
+                    reduce={Boolean(reduce)}
+                  />
+                ))}
+              </ol>
+            ) : (
+              <EmptyState
+                icon={ListOrdered}
+                title="No sessions in this range"
+                description="Widen the time range to see past sessions for this lift."
               />
             )}
           </section>
@@ -234,7 +290,7 @@ export default function ExercisePage() {
                 <Trophy className="size-4 text-highlight" strokeWidth={1.75} />
                 PR history
               </h2>
-              <RepPrList prs={best.repPRs} reduce={Boolean(reduce)} />
+              <RepPrList prs={best.repPRs} unit={unit} reduce={Boolean(reduce)} />
             </section>
           ) : null}
         </div>
@@ -243,7 +299,81 @@ export default function ExercisePage() {
   );
 }
 
-function RepPrList({ prs, reduce }: { prs: RepPR[]; reduce: boolean }) {
+function SessionCard({
+  date,
+  sets,
+  volumeKg,
+  unit,
+  index,
+  reduce,
+}: {
+  date: string;
+  sets: SessionSet[];
+  volumeKg: number;
+  unit: 'kg' | 'lb';
+  index: number;
+  reduce: boolean;
+}) {
+  // Number only the working sets (warm-ups shown but not counted).
+  let workingNo = 0;
+  return (
+    <motion.li
+      className="rounded-xl border border-border bg-card p-4 shadow-sm"
+      initial={reduce ? false : { opacity: 0, y: 8 }}
+      whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.2 }}
+      transition={{ duration: 0.26, ease: EASE_OUT, delay: Math.min(index, 8) * 0.03 }}
+    >
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <span className="text-sm font-semibold text-foreground">{longDate(date)}</span>
+        {volumeKg > 0 ? (
+          <span className="tnum text-xs text-muted-foreground">
+            {formatWeight(volumeKg, unit)} volume
+          </span>
+        ) : null}
+      </div>
+      <ul className="divide-y divide-border/60">
+        {sets.map((set, i) => {
+          const setNo = set.isWarmup ? null : ++workingNo;
+          return (
+            <li
+              key={i}
+              className="flex items-center justify-between gap-3 py-1.5 text-sm"
+            >
+              <span className="flex items-center gap-2">
+                {set.isWarmup ? (
+                  <span className="rounded bg-surface px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Warm-up
+                  </span>
+                ) : (
+                  <span className="tnum w-5 text-center text-xs text-muted-foreground">
+                    {setNo}
+                  </span>
+                )}
+                <span className="tnum font-medium text-foreground">
+                  {formatWeight(set.weightKg, unit)} × {set.reps}
+                </span>
+              </span>
+              {set.rpe != null ? (
+                <span className="tnum text-xs text-muted-foreground">RPE {set.rpe}</span>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+    </motion.li>
+  );
+}
+
+function RepPrList({
+  prs,
+  unit,
+  reduce,
+}: {
+  prs: RepPR[];
+  unit: 'kg' | 'lb';
+  reduce: boolean;
+}) {
   // Heaviest first.
   const ordered = [...prs].sort((a, b) => b.weightKg - a.weightKg);
   return (
@@ -262,7 +392,7 @@ function RepPrList({ prs, reduce }: { prs: RepPR[]; reduce: boolean }) {
           >
             <div className="flex items-baseline gap-2">
               <span className="tnum text-lg font-semibold text-foreground">
-                {isBw ? 'BW' : formatWeight(pr.weightKg, 'kg')}
+                {isBw ? 'BW' : formatWeight(pr.weightKg, unit)}
               </span>
               <span className="text-sm text-muted-foreground">
                 × {pr.reps} {pr.reps === 1 ? 'rep' : 'reps'}
