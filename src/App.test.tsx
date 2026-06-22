@@ -14,8 +14,10 @@ vi.mock('@/data/hooks', () => ({
   useBlocks: () => [],
   useBodyweightSeries: () => [],
   useCoachFindings: () => [],
-  // Exercise + History read settings (for display unit). Default settings are
-  // fine for the shell-mount test.
+  // Logger (/log) + Routines (/routines) read these; Exercise + History read
+  // settings (display unit). Empties/defaults are enough for the shell-mount test.
+  useActiveSession: () => undefined,
+  useRoutines: () => [],
   useSettings: () => ({
     barWeightKg: 20,
     availablePlatesKg: [25, 20, 15, 10, 5, 2.5, 1.25],
