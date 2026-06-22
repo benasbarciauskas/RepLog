@@ -14,6 +14,17 @@ vi.mock('@/data/hooks', () => ({
   useBlocks: () => [],
   useBodyweightSeries: () => [],
   useCoachFindings: () => [],
+  // Logger (/log) + Routines (/routines) read these. No active session and no
+  // saved routines is enough for the shell smoke test (they render the start /
+  // empty views, which still mount the page header heading).
+  useActiveSession: () => undefined,
+  useRoutines: () => [],
+  useSettings: () => ({
+    barWeightKg: 20,
+    availablePlatesKg: [25, 20, 15, 10, 5, 2.5, 1.25],
+    defaultRestSeconds: 120,
+    unit: 'kg' as const,
+  }),
 }));
 
 // Render the shell at a given route. App provides no Router, so we wrap it.
