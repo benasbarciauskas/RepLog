@@ -7,6 +7,7 @@ import {
   Dumbbell,
   Flame,
   LineChart,
+  type LucideProps,
   Scale,
   Trophy,
   Upload,
@@ -413,7 +414,7 @@ function ProgressCard({
   decimals?: number;
   hint?: string;
   tone?: 'default' | 'highlight';
-  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  icon: React.ComponentType<LucideProps>;
   index: number;
   reduce: boolean;
 }) {
