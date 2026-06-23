@@ -17,7 +17,7 @@ export interface SegmentedControlProps<T extends string> {
 }
 
 /**
- * A small segmented control (Strong-style metric toggle / range selector). No
+ * A small segmented control (metric toggle / range selector). No
  * motion — selection is a colour swap, which is high-frequency and instant by
  * design (animating a control tapped repeatedly would feel sluggish; see the
  * design system's "don't animate high-frequency actions").

@@ -102,7 +102,7 @@ export interface ParsedWorkout {
 export interface ParseResult { workouts: ParsedWorkout[]; warnings: string[] }
 
 // ---------------------------------------------------------------------------
-// v1.1 live logger (Strong-style). The active session is the mutable,
+// v1.1 live logger. The active session is the mutable,
 // in-progress workout; on finish it's converted to an immutable `Workout`.
 // Kept separate from `Workout`/`SetEntry` so logging-in-progress rows can be
 // partial (null weight/reps) without weakening the saved data model.

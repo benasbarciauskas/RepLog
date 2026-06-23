@@ -1,7 +1,7 @@
 import { epley1rm } from '@/analytics/epley';
 import type { SetEntry, Workout } from '@/types/models';
 
-/** The selectable progression metrics (Strong-style). */
+/** The selectable progression metrics. */
 export type MetricKey =
   | 'heaviest'
   | 'e1rm'

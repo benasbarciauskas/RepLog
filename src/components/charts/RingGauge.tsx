@@ -46,7 +46,7 @@ export interface RingGaugeProps {
 }
 
 /**
- * Circular score gauge — the Umax-style hero. Hand-rolled SVG (no recharts dep)
+ * Circular score gauge — the score hero. Hand-rolled SVG (no recharts dep)
  * so the arc sweep + centre count-up animate together on the project's strong
  * ease-out curve, and snap instantly under reduced motion (information is never
  * withheld). Numbers are the hero: the centre renders a big `.tnum` value.
