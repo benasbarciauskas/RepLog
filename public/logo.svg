@@ -1,0 +1,15 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="RepLog">
+  <!-- RepLog app mark: acid-lime "R" on a near-black rounded tile.
+       Generous interior padding keeps the glyph inside the maskable safe zone. -->
+  <rect width="512" height="512" rx="112" fill="#0c0d0f"/>
+  <!-- The "R": a barbell-clean grotesk letterform built from rects + a leg,
+       in the brand acid lime. Heavy weight so it reads at 48px. -->
+  <g fill="#a2eb3c">
+    <!-- vertical stem -->
+    <rect x="150" y="132" width="56" height="248" rx="8"/>
+    <!-- bowl (top) — overlaps the stem so there's no seam; counter knocked out -->
+    <path d="M196 132h104a78 78 0 0 1 0 156H196v-52h104a26 26 0 0 0 0-52H196v-52Z"/>
+    <!-- leg -->
+    <path d="M250 262l112 118h-78l-88-92 54-26Z"/>
+  </g>
+</svg>
