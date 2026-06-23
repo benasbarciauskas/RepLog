@@ -1,12 +1,20 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CalendarRange, Play, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
+import { CalendarRange, Play, RefreshCw, Repeat2, Sparkles, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/PageHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { useActiveProgram, useActiveSession, useSettings, useWorkouts } from '@/data/hooks';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { useActiveProgram, useActiveSession, useCustomExercises, useSettings, useWorkouts } from '@/data/hooks';
 import { repository } from '@/data/repository';
 import { refineProgram } from '@/ai/refineProgram';
 import { createCatalog } from '@/parser/catalog';
@@ -15,8 +23,10 @@ import {
   sessionFromProgramDayWithProgression,
 } from '@/features/logger/lib';
 import { incrementForExercise, suggestNextSet } from '@/program/progression';
+import { similarExercises } from '@/program/substitute';
 import { ConfirmDialog } from '@/features/logger/ConfirmDialog';
-import type { Program, ProgramDay, ProgramDayExercise } from '@/types/models';
+import { cn } from '@/lib/utils';
+import type { ExerciseDef, Program, ProgramDay, ProgramDayExercise } from '@/types/models';
 import { ProgramWizard } from './ProgramWizard';
 
 function configSummary(program: Program): string {
@@ -47,18 +57,35 @@ function nextSetLabel(
   return formatNextSetSuggestion(suggestion, ex.repRange, settings.unit);
 }
 
+function humanCategory(c: ExerciseDef['category']): string {
+  return c.charAt(0).toUpperCase() + c.slice(1);
+}
+
+type SwapContext = {
+  dayIndex: number;
+  exIndex: number;
+  ex: ProgramDayExercise;
+};
+
 export default function ProgramPage() {
   const program = useActiveProgram();
   const activeSession = useActiveSession();
   const settings = useSettings();
   const workouts = useWorkouts();
   const navigate = useNavigate();
-  const catalog = useMemo(() => createCatalog(), []);
+  const customExercises = useCustomExercises();
+  const catalog = useMemo(() => createCatalog(customExercises), [customExercises]);
 
   const [showWizard, setShowWizard] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [startDay, setStartDay] = useState<ProgramDay | null>(null);
+  const [swapContext, setSwapContext] = useState<SwapContext | null>(null);
   const [refining, setRefining] = useState(false);
+
+  const swapOptions = useMemo(() => {
+    if (!swapContext) return [];
+    return similarExercises(swapContext.ex.exerciseId, catalog.all());
+  }, [swapContext, catalog]);
 
   const hasAiKey = Boolean(settings.aiApiKey?.trim());
 
@@ -82,6 +109,34 @@ export default function ProgramPage() {
     await repository.deleteProgram(program.id);
     setShowWizard(false);
     toast('Program deleted');
+  }
+
+  async function handleSwapPick(chosen: ExerciseDef) {
+    if (!program || !swapContext) return;
+
+    const { dayIndex, exIndex } = swapContext;
+    const updatedDays = program.days.map((day, di) => {
+      if (di !== dayIndex) return day;
+      return {
+        ...day,
+        exercises: day.exercises.map((ex, ei) => {
+          if (ei !== exIndex) return ex;
+          return {
+            ...ex,
+            exerciseId: chosen.id,
+            rawName: chosen.canonicalName,
+          };
+        }),
+      };
+    });
+
+    await repository.saveProgram({
+      ...program,
+      days: updatedDays,
+      updatedAt: new Date().toISOString(),
+    });
+    setSwapContext(null);
+    toast.success('Exercise swapped', { description: chosen.canonicalName });
   }
 
   async function handleRefine() {
@@ -177,7 +232,7 @@ export default function ProgramPage() {
       />
 
       <ul className="space-y-4">
-        {program.days.map((day) => (
+        {program.days.map((day, dayIndex) => (
           <li key={day.name}>
             <Card className="gap-4 px-5 py-4">
               <div>
@@ -192,9 +247,9 @@ export default function ProgramPage() {
 
               {day.exercises.length > 0 ? (
                 <ul className="space-y-2 text-sm">
-                  {day.exercises.map((ex) => (
+                  {day.exercises.map((ex, exIndex) => (
                     <li
-                      key={ex.exerciseId}
+                      key={`${ex.exerciseId}-${exIndex}`}
                       className="flex items-start justify-between gap-3 border-b border-border/50 pb-2 last:border-0 last:pb-0"
                     >
                       <div className="min-w-0">
@@ -203,9 +258,22 @@ export default function ProgramPage() {
                           next: {nextSetLabel(ex, workouts, settings, catalog)}
                         </p>
                       </div>
-                      <span className="tnum shrink-0 text-xs text-muted-foreground">
-                        {exerciseLine(ex)}
-                      </span>
+                      <div className="flex shrink-0 items-start gap-2">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 gap-1 px-2 text-xs text-muted-foreground"
+                          aria-label={`Swap ${ex.rawName}`}
+                          onClick={() => setSwapContext({ dayIndex, exIndex, ex })}
+                        >
+                          <Repeat2 className="size-3.5" strokeWidth={1.75} aria-hidden />
+                          Swap
+                        </Button>
+                        <span className="tnum text-xs text-muted-foreground">
+                          {exerciseLine(ex)}
+                        </span>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -247,6 +315,54 @@ export default function ProgramPage() {
           if (startDay) void doStartDay(startDay);
         }}
       />
+
+      <Dialog open={swapContext != null} onOpenChange={(o) => !o && setSwapContext(null)}>
+        <DialogContent className="max-h-[80vh] gap-3 overflow-hidden p-0 sm:max-w-md">
+          <DialogHeader className="px-6 pt-6">
+            <DialogTitle>Swap exercise</DialogTitle>
+            <DialogDescription>
+              {swapContext
+                ? `Replace ${swapContext.ex.rawName} with a similar movement from the catalog.`
+                : 'Pick a similar exercise.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <ul
+            className="max-h-[52vh] overflow-y-auto px-3 pb-3"
+            role="listbox"
+            aria-label="Similar exercises"
+          >
+            {swapOptions.length === 0 ? (
+              <li className="px-3 py-6 text-center text-sm text-muted-foreground">
+                No close matches for this exercise.
+              </li>
+            ) : (
+              swapOptions.map(({ def, reason }) => (
+                <li key={def.id}>
+                  <button
+                    type="button"
+                    onClick={() => void handleSwapPick(def)}
+                    className={cn(
+                      'flex w-full flex-col gap-1 rounded-lg px-3 py-2.5 text-left transition-colors',
+                      'hover:bg-surface-elevated focus-visible:bg-surface-elevated focus-visible:outline-none',
+                    )}
+                  >
+                    <span className="flex items-center justify-between gap-3">
+                      <span className="min-w-0 truncate text-sm font-medium text-foreground">
+                        {def.canonicalName}
+                      </span>
+                      <Badge variant="outline" className="shrink-0">
+                        {humanCategory(def.category)}
+                      </Badge>
+                    </span>
+                    <span className="text-xs text-muted-foreground">{reason}</span>
+                  </button>
+                </li>
+              ))
+            )}
+          </ul>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -10,6 +10,7 @@ import type {
   AppSettings,
   CoachFinding,
   ExerciseBest,
+  ExerciseDef,
   Program,
   RawNote,
   Routine,
@@ -79,6 +80,11 @@ export function useRoutines(): Routine[] {
     [],
     [],
   );
+}
+
+/** Live list of user-defined custom exercises. */
+export function useCustomExercises(): ExerciseDef[] {
+  return useLiveQuery(() => db.customExercises.toArray(), [], []);
 }
 
 /** The most recently updated program (single active program for v1). */

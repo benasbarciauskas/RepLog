@@ -11,6 +11,7 @@ vi.mock('@/data/hooks', () => ({
   useActiveSession: () => activeSession,
   useWorkouts: () => [],
   useSettings: () => ({ unit: 'kg', barWeightKg: 20, availablePlatesKg: [20], defaultRestSeconds: 120 }),
+  useCustomExercises: () => [],
 }));
 
 const saveProgram = vi.fn<(p: Program) => Promise<void>>(async () => {});
@@ -115,5 +116,27 @@ describe('ProgramPage', () => {
     expect(seeded.exercises[0].sets).toHaveLength(3);
     expect(seeded.exercises[0].sets[0].weightKg).toBeNull();
     expect(seeded.exercises[0].sets[0].reps).toBe(8);
+  });
+
+  it('opens swap dialog and persists a substituted exercise', async () => {
+    activeProgram = SAMPLE_PROGRAM;
+    await renderProgram();
+
+    fireEvent.click(screen.getByRole('button', { name: /swap barbell bench press/i }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText('Swap exercise')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /dumbbell bench press/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /dumbbell bench press/i }));
+    await waitFor(() => expect(saveProgram).toHaveBeenCalledTimes(1));
+
+    const updated = saveProgram.mock.calls[0][0];
+    const swapped = updated.days[0].exercises[0];
+    expect(swapped.exerciseId).toBe('dumbbell-bench-press');
+    expect(swapped.rawName).toBe('Dumbbell Bench Press');
+    expect(swapped.targetSets).toBe(3);
+    expect(swapped.repRange).toEqual([8, 12]);
+    expect(swapped.rir).toBe(2);
+    expect(swapped.restSeconds).toBe(150);
   });
 });
