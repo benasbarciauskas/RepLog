@@ -72,8 +72,28 @@ export interface Repository {
   getSettings(): Promise<AppSettings>;
   saveSettings(s: AppSettings): Promise<void>;
 
+  exportData(): Promise<Blob>;
+  importData(json: string | object): Promise<void>;
+
   clearAll(): Promise<void>;
 }
+
+const EXPORT_APP = 'RepLog';
+const EXPORT_VERSION = 1;
+
+/** On-disk backup shape (v1). `activeSession` is intentionally excluded. */
+export type RepLogExportFile = {
+  app: string;
+  version: number;
+  exportedAt: string;
+  data: {
+    notes?: RawNote[];
+    workouts?: Workout[];
+    customExercises?: ExerciseDef[];
+    routines?: Routine[];
+    settings?: (AppSettings & { id: string })[];
+  };
+};
 
 /** Dexie/IndexedDB-backed implementation. */
 export class LocalRepository implements Repository {
@@ -191,6 +211,67 @@ export class LocalRepository implements Repository {
 
   async saveSettings(s: AppSettings): Promise<void> {
     await db.settings.put({ ...s, id: SETTINGS_KEY });
+  }
+
+  async exportData(): Promise<Blob> {
+    const [notes, workouts, customExercises, routines, settings] = await Promise.all([
+      db.notes.toArray(),
+      db.workouts.toArray(),
+      db.customExercises.toArray(),
+      db.routines.toArray(),
+      db.settings.toArray(),
+    ]);
+
+    const payload: RepLogExportFile = {
+      app: EXPORT_APP,
+      version: EXPORT_VERSION,
+      exportedAt: new Date().toISOString(),
+      data: { notes, workouts, customExercises, routines, settings },
+    };
+
+    return new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  }
+
+  async importData(json: string | object): Promise<void> {
+    const parsed: RepLogExportFile =
+      typeof json === 'string' ? (JSON.parse(json) as RepLogExportFile) : (json as RepLogExportFile);
+
+    if (parsed.app !== EXPORT_APP) {
+      throw new Error('Not a RepLog backup file');
+    }
+
+    const data = parsed.data ?? {};
+    const importTables = [db.notes, db.workouts, db.customExercises, db.routines, db.settings];
+
+    await db.transaction('rw', importTables, async () => {
+      if (data.notes !== undefined) {
+        if (!Array.isArray(data.notes)) throw new Error('Invalid backup: "notes" must be an array');
+        await db.notes.clear();
+        if (data.notes.length > 0) await db.notes.bulkPut(data.notes);
+      }
+      if (data.workouts !== undefined) {
+        if (!Array.isArray(data.workouts)) throw new Error('Invalid backup: "workouts" must be an array');
+        await db.workouts.clear();
+        if (data.workouts.length > 0) await db.workouts.bulkPut(data.workouts);
+      }
+      if (data.customExercises !== undefined) {
+        if (!Array.isArray(data.customExercises)) {
+          throw new Error('Invalid backup: "customExercises" must be an array');
+        }
+        await db.customExercises.clear();
+        if (data.customExercises.length > 0) await db.customExercises.bulkPut(data.customExercises);
+      }
+      if (data.routines !== undefined) {
+        if (!Array.isArray(data.routines)) throw new Error('Invalid backup: "routines" must be an array');
+        await db.routines.clear();
+        if (data.routines.length > 0) await db.routines.bulkPut(data.routines);
+      }
+      if (data.settings !== undefined) {
+        if (!Array.isArray(data.settings)) throw new Error('Invalid backup: "settings" must be an array');
+        await db.settings.clear();
+        if (data.settings.length > 0) await db.settings.bulkPut(data.settings);
+      }
+    });
   }
 
   async clearAll(): Promise<void> {

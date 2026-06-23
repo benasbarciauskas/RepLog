@@ -101,7 +101,8 @@ describe('HistoryPage', { timeout: 20000 }, () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /barbell bench press/i })).toBeInTheDocument();
     expect(screen.getByText(/140 kg × 3/)).toBeInTheDocument();
-    expect(screen.getByText(/warm-up/i)).toBeInTheDocument();
+    // Warm-up sets now carry the lime "W" logo-style badge (aria-labelled).
+    expect(screen.getByRole('img', { name: /warm-up set/i })).toBeInTheDocument();
     // Deep-link into the exercise progress page.
     expect(screen.getByRole('link', { name: /progress/i })).toHaveAttribute(
       'href',

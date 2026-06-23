@@ -136,8 +136,10 @@ describe('ExercisePage', { timeout: 20000 }, () => {
     // Default chart card shows the Est. 1RM metric.
     expect(screen.getByText('Estimated 1RM')).toBeInTheDocument();
 
-    // Pick "Heaviest" from the metric toggle → chart card retitles.
-    fireEvent.click(screen.getByRole('tab', { name: 'Heaviest' }));
+    // Pick the heaviest-weight metric from the toggle → chart card retitles.
+    // The tab shows the concise label "Weight" but is aria-labelled with the
+    // full name ("Heaviest weight") for screen readers.
+    fireEvent.click(screen.getByRole('tab', { name: 'Heaviest weight' }));
     expect(screen.getByText('Heaviest weight')).toBeInTheDocument();
   });
 

@@ -9,12 +9,17 @@ export type MetricKey =
   | 'sessionVolume'
   | 'totalReps';
 
+/**
+ * `label` = the full metric name (chart title + aria-label). `short` = the
+ * concise, native one-line label for the segmented toggle so options never wrap
+ * onto multiple lines on a phone (e.g. "Best-set Volume" → "Set Vol").
+ */
 export const METRICS: { key: MetricKey; label: string; short: string; unit: string }[] = [
-  { key: 'heaviest', label: 'Heaviest weight', short: 'Heaviest', unit: 'kg' },
-  { key: 'e1rm', label: 'Estimated 1RM', short: 'Est. 1RM', unit: 'kg' },
-  { key: 'bestSetVolume', label: 'Best-set volume', short: 'Top-set vol', unit: 'kg' },
-  { key: 'sessionVolume', label: 'Session volume', short: 'Session vol', unit: 'kg' },
-  { key: 'totalReps', label: 'Total reps', short: 'Total reps', unit: '' },
+  { key: 'heaviest', label: 'Heaviest weight', short: 'Weight', unit: 'kg' },
+  { key: 'e1rm', label: 'Estimated 1RM', short: '1RM', unit: 'kg' },
+  { key: 'bestSetVolume', label: 'Best-set volume', short: 'Set Vol', unit: 'kg' },
+  { key: 'sessionVolume', label: 'Session volume', short: 'Volume', unit: 'kg' },
+  { key: 'totalReps', label: 'Total reps', short: 'Reps', unit: '' },
 ];
 
 /** Selectable time ranges. `null` months = all-time. */

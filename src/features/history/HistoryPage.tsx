@@ -1,12 +1,15 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { motion, useReducedMotion } from 'motion/react';
 import { ArrowLeft, ChevronRight, Dumbbell, History, Upload } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { EmptyState } from '@/components/EmptyState';
+import { WarmupBadge } from '@/components/WarmupBadge';
 import { Button } from '@/components/ui/button';
 import { useSettings, useWorkouts } from '@/data/hooks';
 import { createCatalog } from '@/parser/catalog';
+import { db } from '@/data/db';
 import { formatWeight } from '@/lib/units';
 import { workoutVolumeKg } from '@/features/dashboard/stats';
 import type { Unit, Workout } from '@/types/models';
@@ -24,15 +27,18 @@ function longDate(iso: string): string {
   return `${Number(d)} ${MONTHS[Number(m) - 1] ?? m} ${y}`;
 }
 
-/** Resolve a catalog/unknown exerciseId to a display name. */
+/** Resolve a catalog/custom/unknown exerciseId to a display name. */
 function useNameResolver() {
-  const catalog = useMemo(() => createCatalog(), []);
+  // Include persisted custom exercises so `custom:*` ids resolve to their
+  // canonical names rather than a de-slugged guess.
+  const custom = useLiveQuery(() => db.customExercises.toArray(), [], []);
+  const catalog = useMemo(() => createCatalog(custom), [custom]);
   return useMemo(() => {
     const byId = new Map(catalog.all().map((d) => [d.id, d.canonicalName]));
     return (exerciseId: string): string => {
       const known = byId.get(exerciseId);
       if (known) return known;
-      const slug = exerciseId.replace(/^unknown:/, '').replace(/[-_]/g, ' ');
+      const slug = exerciseId.replace(/^(unknown|custom):/, '').replace(/[-_]/g, ' ');
       return slug.replace(/\b\w/g, (c) => c.toUpperCase()) || exerciseId;
     };
   }, [catalog]);
@@ -243,9 +249,7 @@ function WorkoutDetail({
                     >
                       <span className="flex items-center gap-2">
                         {set.isWarmup ? (
-                          <span className="rounded bg-surface px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                            Warm-up
-                          </span>
+                          <WarmupBadge />
                         ) : (
                           <span className="tnum w-5 text-center text-xs text-muted-foreground">
                             {setNo}

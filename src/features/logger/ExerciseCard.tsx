@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { ChevronDown, ChevronUp, GripVertical, Plus, Trash2 } from 'lucide-react';
+import { Calculator, ChevronDown, ChevronUp, GripVertical, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -51,6 +51,8 @@ export function ExerciseCard({
   // Map a working-set index → its previous-set entry (warm-ups have no previous).
   let workingIdx = -1;
   const restSeconds = exercise.restSeconds ?? settings.defaultRestSeconds;
+  // Weight to seed the plate calculator: the first set with a logged weight.
+  const plateWeight = exercise.sets.find((s) => s.weightKg != null)?.weightKg ?? null;
 
   return (
     <Card className="gap-3 py-4">
@@ -63,6 +65,14 @@ export function ExerciseCard({
           {exercise.rawName}
         </h3>
         <div className="flex shrink-0 items-center gap-0.5">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => onOpenPlates(plateWeight)}
+            aria-label="Plate calculator"
+          >
+            <Calculator className="size-4" strokeWidth={1.75} />
+          </Button>
           <Button
             variant="ghost"
             size="icon-sm"
@@ -94,7 +104,7 @@ export function ExerciseCard({
       </div>
 
       {/* Column labels */}
-      <div className="grid grid-cols-[2rem_3.5rem_1fr_1fr_2.75rem_2rem] gap-1.5 px-5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground sm:gap-2">
+      <div className="grid grid-cols-[1.75rem_3.25rem_minmax(0,1fr)_minmax(0,1fr)_3.5rem_3.75rem] gap-1.5 px-5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground sm:gap-2">
         <span className="text-center">Set</span>
         <span>Prev</span>
         <span className="text-center">{unit === 'lb' ? 'lb' : 'kg'}</span>
@@ -119,7 +129,6 @@ export function ExerciseCard({
                 onPatch={(patch) => onPatchSet(set.id, patch)}
                 onToggleDone={() => onToggleDone(set.id, restSeconds)}
                 onRemove={() => onRemoveSet(set.id)}
-                onOpenPlates={() => onOpenPlates(set.weightKg)}
               />
             </div>
           );
