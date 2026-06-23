@@ -18,6 +18,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   availablePlatesKg: [25, 20, 15, 10, 5, 2.5, 1.25],
   defaultRestSeconds: 120,
   unit: 'kg',
+  aiModel: 'meta-llama/llama-3.3-70b-instruct:free',
 };
 
 /** Today's date as an ISO `yyyy-mm-dd` string (local time). */
@@ -34,6 +35,8 @@ export function stripSettingsKey(stored: AppSettings & { id: string }): AppSetti
     availablePlatesKg: stored.availablePlatesKg,
     defaultRestSeconds: stored.defaultRestSeconds,
     unit: stored.unit,
+    ...(stored.aiApiKey !== undefined ? { aiApiKey: stored.aiApiKey } : {}),
+    ...(stored.aiModel !== undefined ? { aiModel: stored.aiModel } : {}),
   };
 }
 
@@ -222,11 +225,17 @@ export class LocalRepository implements Repository {
       db.settings.toArray(),
     ]);
 
+    const safeSettings = settings.map((s) => {
+      const rest = { ...s };
+      delete rest.aiApiKey;
+      return rest;
+    });
+
     const payload: RepLogExportFile = {
       app: EXPORT_APP,
       version: EXPORT_VERSION,
       exportedAt: new Date().toISOString(),
-      data: { notes, workouts, customExercises, routines, settings },
+      data: { notes, workouts, customExercises, routines, settings: safeSettings },
     };
 
     return new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });

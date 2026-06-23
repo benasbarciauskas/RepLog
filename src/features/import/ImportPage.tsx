@@ -25,7 +25,9 @@ import type { NoteSource, RawNote } from '@/types/models';
 import { imageToText } from '@/ocr/ocr';
 import { stitchOcrText } from '@/ocr/stitch';
 import { VideoDecodeError, videoToFrames } from '@/ocr/video';
-import { useWorkouts } from '@/data/hooks';
+import { useSettings, useWorkouts } from '@/data/hooks';
+import { aiParseWorkouts } from '@/ai/openrouter';
+import { createCatalog } from '@/parser';
 import { TrySampleDataButton } from '@/features/data/DataActions';
 import { ingestCorpus } from './pipeline';
 import { REVIEW_STATE_TAG, type ReviewRouteState } from './types';
@@ -47,6 +49,7 @@ export default function ImportPage() {
   const navigate = useNavigate();
   const reduce = useReducedMotion();
   const workouts = useWorkouts();
+  const settings = useSettings();
 
   const [mode, setMode] = useState<Mode>('screenshots');
   const [images, setImages] = useState<File[]>([]);
@@ -72,7 +75,9 @@ export default function ImportPage() {
           setPasteText(trimmed);
           setMode('paste');
           toast.info(
-            "Couldn't auto-detect a workout. Here's the text we read — edit it or paste your note, then Parse.",
+            settings?.aiApiKey
+              ? "Couldn't auto-detect a workout. Here's the text we read — try AI parse, or edit and Parse."
+              : "Couldn't auto-detect a workout. Here's the text we read — edit it or paste your note, then Parse.",
           );
           return false;
         }
@@ -108,7 +113,68 @@ export default function ImportPage() {
       navigate('/review', { state });
       return true;
     },
-    [navigate, setPasteText, setMode],
+    [navigate, setPasteText, setMode, settings?.aiApiKey],
+  );
+
+  const aiParse = useCallback(
+    async (corpus: string) => {
+      if (!settings?.aiApiKey) {
+        toast.error('Add your OpenRouter key in Settings to use AI parse.');
+        return;
+      }
+      const trimmed = corpus.trim();
+      if (!trimmed) {
+        toast.error('Nothing to parse', {
+          description: 'Paste or edit your workout notes first.',
+        });
+        return;
+      }
+
+      setBusy(true);
+      setProgress({ value: null, label: 'AI parsing…' });
+      try {
+        const custom = await repository.getCustomExercises();
+        const catalog = createCatalog(custom);
+        const parsed = await aiParseWorkouts(
+          trimmed,
+          {
+            apiKey: settings.aiApiKey,
+            model: settings.aiModel || 'meta-llama/llama-3.3-70b-instruct:free',
+          },
+          catalog,
+        );
+
+        if (parsed.length === 0) {
+          toast.error('AI did not find a workout in that text.');
+          return;
+        }
+
+        const note: RawNote = {
+          id: newId(),
+          sourceType: 'paste',
+          rawText: trimmed,
+          importedAt: new Date().toISOString(),
+          status: 'needs-review',
+        };
+        void repository.addNote(note);
+
+        const state: ReviewRouteState & { tag: typeof REVIEW_STATE_TAG } = {
+          tag: REVIEW_STATE_TAG,
+          workouts: parsed,
+          skippedCount: 0,
+          skipped: [],
+          warnings: ['Parsed with AI — double-check the numbers before saving.'],
+          sourceLabels: undefined,
+        };
+        navigate('/review', { state });
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'AI parse failed.');
+      } finally {
+        setBusy(false);
+        setProgress(IDLE);
+      }
+    },
+    [navigate, settings?.aiApiKey, settings?.aiModel],
   );
 
   // --- Screenshots → OCR each → corpus -------------------------------------
@@ -271,7 +337,24 @@ export default function ImportPage() {
           </motion.div>
         ) : null}
 
-        <div className="flex justify-end">
+        <div className="flex flex-wrap justify-end gap-2">
+          {mode === 'paste' && settings?.aiApiKey ? (
+            <motion.div whileTap={reduce || busy || !pasteText.trim() ? undefined : { scale: 0.97 }}>
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => void aiParse(pasteText)}
+                disabled={busy || pasteText.trim().length === 0}
+              >
+                {busy ? (
+                  <Loader2 className="animate-spin" aria-hidden />
+                ) : (
+                  <ScanText aria-hidden />
+                )}
+                {busy ? 'Working…' : 'AI parse'}
+              </Button>
+            </motion.div>
+          ) : null}
           <ParseButton mode={mode} busy={busy} reduce={reduce} onClick={runForMode(mode, { parseScreenshots, parsePaste, parseVideo })} disabled={isDisabled(mode, { images, pasteText, videoFile, busy })} />
         </div>
       </div>

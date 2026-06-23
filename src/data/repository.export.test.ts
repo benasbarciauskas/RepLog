@@ -87,6 +87,21 @@ describe('LocalRepository — export/import', () => {
     expect(settings.barWeightKg).toBe(45);
   });
 
+  it('omits aiApiKey from exported settings', async () => {
+    await repo.saveSettings({
+      ...DEFAULT_SETTINGS,
+      aiApiKey: 'sk-or-secret-should-not-export',
+      aiModel: 'meta-llama/llama-3.3-70b-instruct:free',
+    });
+
+    const blob = await repo.exportData();
+    const exported = JSON.parse(await readBlobText(blob));
+
+    expect(exported.data.settings).toHaveLength(1);
+    expect(exported.data.settings[0]).not.toHaveProperty('aiApiKey');
+    expect(exported.data.settings[0].aiModel).toBe('meta-llama/llama-3.3-70b-instruct:free');
+  });
+
   it('rejects backups from other apps', async () => {
     await expect(
       repo.importData({ app: 'OtherApp', version: 1, exportedAt: '', data: {} }),

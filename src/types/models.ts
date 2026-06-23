@@ -160,4 +160,8 @@ export interface AppSettings {
   availablePlatesKg: number[];
   defaultRestSeconds: number;
   unit: Unit;
+  /** User's OpenRouter API key — stored locally, never exported in backups. */
+  aiApiKey?: string;
+  /** OpenRouter model id for AI parse (defaults to a free tier model). */
+  aiModel?: string;
 }

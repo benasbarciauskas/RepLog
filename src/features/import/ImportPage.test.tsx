@@ -4,8 +4,9 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { PPL_NOTE } from '@/parser/__tests__/fixtures/notes';
 import type { ReviewRouteState } from './types';
 
-const { imageToTextMock, toastError, toastInfo } = vi.hoisted(() => ({
+const { imageToTextMock, settingsMock, toastError, toastInfo } = vi.hoisted(() => ({
   imageToTextMock: vi.fn(async () => ''),
+  settingsMock: vi.fn(() => ({})),
   toastError: vi.fn(),
   toastInfo: vi.fn(),
 }));
@@ -13,7 +14,10 @@ const { imageToTextMock, toastError, toastInfo } = vi.hoisted(() => ({
 // Mock OCR + repository so the page renders without tesseract / IndexedDB.
 vi.mock('@/ocr/ocr', () => ({ imageToText: imageToTextMock }));
 vi.mock('@/data/repository', () => ({
-  repository: { addNote: vi.fn(async () => {}) },
+  repository: {
+    addNote: vi.fn(async () => {}),
+    getCustomExercises: vi.fn(async () => []),
+  },
 }));
 vi.mock('sonner', () => ({
   toast: Object.assign(vi.fn(), {
@@ -24,6 +28,7 @@ vi.mock('sonner', () => ({
 }));
 vi.mock('@/data/hooks', () => ({
   useWorkouts: () => [],
+  useSettings: () => settingsMock(),
 }));
 
 // A stub Review screen that surfaces the route-state it received, so the test
@@ -54,6 +59,7 @@ async function renderImport() {
 const NON_WORKOUT_TEXT = 'Grocery list: milk, eggs, bread';
 
 beforeEach(() => {
+  settingsMock.mockReturnValue({});
   vi.stubGlobal('URL', {
     ...URL,
     createObjectURL: vi.fn(() => 'blob:mock-preview'),
@@ -150,6 +156,18 @@ describe('ImportPage', () => {
     expect(screen.getByRole('tab', { name: /Paste/ })).toHaveAttribute('data-state', 'active');
     expect(screen.queryByRole('heading', { name: 'Review Stub' })).not.toBeInTheDocument();
     expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it('shows the AI parse button only when an OpenRouter key is set', async () => {
+    await renderImport();
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /Paste/ }));
+    expect(screen.queryByRole('button', { name: /AI parse/i })).not.toBeInTheDocument();
+
+    settingsMock.mockReturnValue({ aiApiKey: 'sk-or-test' });
+    cleanup();
+    await renderImport();
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /Paste/ }));
+    expect(screen.getByRole('button', { name: /AI parse/i })).toBeInTheDocument();
   });
 
   it('shows an error when OCR reads no text from screenshots', async () => {

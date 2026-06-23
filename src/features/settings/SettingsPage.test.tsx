@@ -63,6 +63,15 @@ describe('SettingsPage', () => {
     );
   });
 
+  it('persists an OpenRouter API key via saveSettings', async () => {
+    await renderSettings();
+    const input = screen.getByLabelText(/OpenRouter API key/i);
+    fireEvent.change(input, { target: { value: '  sk-or-test-key  ' } });
+    expect(saveSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ aiApiKey: 'sk-or-test-key' }),
+    );
+  });
+
   it('reflects the BASE_URL channel — local build shows Stable link while beta is unpublished', async () => {
     // In the test environment import.meta.env.BASE_URL is '/', i.e. a local build.
     expect(detectChannel(import.meta.env.BASE_URL)).toBe('local');

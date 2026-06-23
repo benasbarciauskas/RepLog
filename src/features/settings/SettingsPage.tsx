@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SegmentedControl } from '@/features/exercise/SegmentedControl';
 import { useSettings } from '@/data/hooks';
-import { repository } from '@/data/repository';
+import { DEFAULT_SETTINGS, repository } from '@/data/repository';
 import { formatWeight } from '@/lib/units';
 import type { AppSettings, Unit } from '@/types/models';
 import { BETA_AVAILABLE, CHANNEL_URLS, type Channel, detectChannel } from './channel';
@@ -234,6 +234,88 @@ export default function SettingsPage() {
                 </Button>
               ))}
             </div>
+          </div>
+        </SettingsSection>
+
+        {/* AI parsing */}
+        <SettingsSection
+          title="AI parsing (optional)"
+          description="Use your own free OpenRouter key to turn messy notes into workouts. Everything stays on-device until you use AI parse — then the note text is sent to OpenRouter."
+        >
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label htmlFor="ai-api-key" className="text-sm font-medium text-foreground">
+                OpenRouter API key
+              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  id="ai-api-key"
+                  type="password"
+                  autoComplete="off"
+                  placeholder="sk-or-…"
+                  aria-label="OpenRouter API key"
+                  className="max-w-md"
+                  value={settings.aiApiKey ?? ''}
+                  onChange={(e) => save({ aiApiKey: e.target.value.trim() || undefined })}
+                />
+                {settings.aiApiKey ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => save({ aiApiKey: undefined })}
+                  >
+                    Clear key
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="ai-model" className="text-sm font-medium text-foreground">
+                Model
+              </label>
+              <Input
+                id="ai-model"
+                type="text"
+                placeholder="meta-llama/llama-3.3-70b-instruct:free"
+                aria-label="OpenRouter model"
+                className="max-w-md"
+                value={settings.aiModel ?? ''}
+                onChange={(e) =>
+                  save({
+                    aiModel: e.target.value.trim() || DEFAULT_SETTINGS.aiModel,
+                  })
+                }
+              />
+            </div>
+
+            <p className="text-sm text-muted-foreground">
+              <a
+                href="https://openrouter.ai/keys"
+                target="_blank"
+                rel="noreferrer"
+                className="text-highlight underline-offset-2 hover:underline"
+              >
+                Get a free key
+              </a>
+              {' — '}
+              free models are listed at{' '}
+              <a
+                href="https://openrouter.ai/models"
+                target="_blank"
+                rel="noreferrer"
+                className="text-highlight underline-offset-2 hover:underline"
+              >
+                openrouter.ai/models
+              </a>{' '}
+              (filter Free).
+            </p>
+
+            <p className="text-xs text-muted-foreground">
+              Your key stays on this device and is only sent as the Authorization header on AI-parse
+              requests. It is never included in exported backups.
+            </p>
           </div>
         </SettingsSection>
 
