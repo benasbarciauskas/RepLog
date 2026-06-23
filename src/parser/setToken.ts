@@ -82,6 +82,23 @@ export function parseToken(token: string): TokenResult | null {
     };
   }
 
+  // WEIGHT x REPS @ WEIGHT: "100x5 @ 100" — a single set whose `@ W` is a (non-RPE)
+  // weight annotation, NOT reps and NOT a set count. Any trailing RPE (`@<=10`)
+  // was already peeled above, so the remaining `@ N` here is a weight; it takes
+  // precedence as the set's weight. Prevents "100x5 @ 100" exploding or being
+  // mis-read as bare reps 100.
+  const withWeightAtWeight = t.match(
+    /^(\d+(?:\.\d+)?)\s*(kgs?|kg|lbs?|lb)?\s*[x\u00d7]\s*(\d+(?:\.\d+)?)\s*@\s*(\d+(?:\.\d+)?)\s*(kgs?|kg|lbs?|lb)?$/i,
+  );
+  if (withWeightAtWeight) {
+    return {
+      weightKg: weightToKg(withWeightAtWeight[4], withWeightAtWeight[5]),
+      reps: Math.round(Number.parseFloat(withWeightAtWeight[3])),
+      repsOnly: false,
+      rpe,
+    };
+  }
+
   // WEIGHT [unit] for REPS [reps]: "100 for 5", "100kg for 8 reps".
   const weightForReps = t.match(
     /^(\d+(?:\.\d+)?)\s*(kgs?|kg|lbs?|lb)?\s+for\s+(\d+(?:\.\d+)?)(?:\s*reps?)?$/i,

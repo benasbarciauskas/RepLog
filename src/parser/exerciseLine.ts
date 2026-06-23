@@ -1,5 +1,5 @@
 import type { ExerciseDef, SetEntry, WorkoutExercise } from '@/types/models';
-import { parseToken, roundNum, tokenizePart, weightToKg } from './setToken';
+import { extractRpe, parseToken, roundNum, tokenizePart, weightToKg } from './setToken';
 import type { ExerciseCatalog } from './catalog';
 
 /**
@@ -105,9 +105,39 @@ function stripBodyweightMarker(name: string): string {
  */
 function parseSets(setText: string): SetEntry[] {
   // Normalize: collapse multiple spaces, trim.
-  const text = setText.replace(/\.{2,}|…/g, '').trim();
-  if (!text) return [];
+  const normalized = setText.replace(/\.{2,}|…/g, '').trim();
+  if (!normalized) return [];
 
+  // Peel a WHOLE-TEXT trailing RPE ("100x5 @8", "...@RPE8") up front so a
+  // trailing `@N` (N <= 10) can never be swallowed by the scheme / drop / @-weight
+  // matchers below as a weight or a set-count (which exploded "100x5 @8" into ~100
+  // phantom sets). The peeled RPE is re-attached to the LAST parsed set after
+  // parsing the remaining text; per-token `@RPE` inside a comma list is still
+  // handled by scanTokens, so multi-set lists keep their own per-set RPE.
+  const { rest: text, rpe: trailingRpe } = extractRpe(normalized);
+  if (!text) return [];
+  const result = parseSetsInner(text);
+  if (trailingRpe !== undefined && result.length > 0) {
+    const last = result[result.length - 1];
+    if (last.rpe === undefined) last.rpe = trailingRpe;
+  }
+  return result;
+}
+
+/**
+ * Is a matched `N x M @ W` truly a SETS x REPS @ WEIGHT scheme (n sets of m reps),
+ * and not a single working set `WEIGHTxREPS` with a redundant `@ WEIGHT`? A scheme
+ * has a SMALL set count (<= 12) and a weight that exceeds the set count. Without
+ * this, "100x5 @ 100" matched and exploded into 100 identical sets. Such a string
+ * instead falls through to the per-token scanner (one set of 100x5).
+ */
+function isSetsRepsScheme(m: RegExpMatchArray): boolean {
+  const n = Number.parseInt(m[1], 10); // claimed set count
+  const w = Number.parseFloat(m[3]); // claimed weight
+  return n >= 1 && n <= 12 && w > n;
+}
+
+function parseSetsInner(text: string): SetEntry[] {
   // 0. SETS x REPS @ WEIGHT scheme: "5x5 @ 100", "3 x 8 @ 100kg".
   //    Distinguished from the WEIGHT xNxM scheme (1, below) by the trailing
   //    `@ WEIGHT`: the `@` makes the leading number the SET COUNT, the second
@@ -115,7 +145,7 @@ function parseSets(setText: string): SetEntry[] {
   const setsRepsAtWeight = text.match(
     /^(\d+)\s*[x×]\s*(\d+)\s*@\s*(\d+(?:\.\d+)?)\s*(kgs?|kg|lbs?|lb)?\s*$/i,
   );
-  if (setsRepsAtWeight) {
+  if (setsRepsAtWeight && isSetsRepsScheme(setsRepsAtWeight)) {
     const n = Number.parseInt(setsRepsAtWeight[1], 10); // number of sets
     const m = Number.parseInt(setsRepsAtWeight[2], 10); // reps per set
     const weight = weightToKg(setsRepsAtWeight[3], setsRepsAtWeight[4]);

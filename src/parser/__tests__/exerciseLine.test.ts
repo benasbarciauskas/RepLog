@@ -274,4 +274,40 @@ describe('parseExerciseLine', () => {
     expect(ex.sets[0].weightKg).toBeCloseTo(102.06, 1);
     expect(ex.sets[0].reps).toBe(5);
   });
+  it('attaches trailing RPE to a name-prefixed working set without exploding', () => {
+    const ex = parseExerciseLine('bench 100x5 @8', cat)[0];
+    expect(ex.sets).toHaveLength(1);
+    expect(ex.sets[0]).toMatchObject({ weightKg: 100, reps: 5, rpe: 8 });
+  });
+
+  it('attaches trailing RPE @9 to a name-prefixed set', () => {
+    const ex = parseExerciseLine('squat 140x5 @9', cat)[0];
+    expect(ex.sets).toHaveLength(1);
+    expect(ex.sets[0]).toMatchObject({ weightKg: 140, reps: 5, rpe: 9 });
+  });
+
+  it('attaches a trailing RPE to the last set of a carried-weight list', () => {
+    const ex = parseExerciseLine('bench 100x5, 5, 5 @8', cat)[0];
+    expect(ex.sets).toHaveLength(3);
+    expect(ex.sets.map((s) => [s.weightKg, s.reps])).toEqual([
+      [100, 5],
+      [100, 5],
+      [100, 5],
+    ]);
+    expect(ex.sets[2].rpe).toBe(8);
+    expect(ex.sets[0].rpe).toBeUndefined();
+    expect(ex.sets[1].rpe).toBeUndefined();
+  });
+
+  it('still parses "@ 100" as a WEIGHT in the sets x reps scheme, not RPE', () => {
+    const ex = parseExerciseLine('Bench: 5x5 @ 100', cat)[0];
+    expect(ex.sets).toHaveLength(5);
+    expect(ex.sets.every((s) => s.weightKg === 100 && s.reps === 5)).toBe(true);
+  });
+
+  it('does not explode "100x5 @ 100" into 100 sets', () => {
+    const ex = parseExerciseLine('bench 100x5 @ 100', cat)[0];
+    expect(ex.sets.length).toBeLessThanOrEqual(2);
+    expect(ex.sets[0]).toMatchObject({ weightKg: 100, reps: 5 });
+  });
 });
