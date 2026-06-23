@@ -3,6 +3,7 @@ import type { ExerciseCatalog } from './catalog';
 import { parseExerciseLine } from './exerciseLine';
 import { detectSplit, extractBodyweight, extractDate } from './fields';
 import { segmentWorkouts } from './segment';
+import { preprocessStructured } from './structured';
 
 /**
  * Top-level entry point: parse a raw note (one or many sessions) into candidate
@@ -13,7 +14,8 @@ export function parseNotes(rawText: string, catalog: ExerciseCatalog): ParseResu
   const warnings: string[] = [];
   const workouts: ParsedWorkout[] = [];
 
-  const chunks = segmentWorkouts(rawText);
+  const text = preprocessStructured(rawText);
+  const chunks = segmentWorkouts(text);
 
   for (const chunk of chunks) {
     const lines = chunk.split(/\r?\n/);
