@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { repository } from '@/data/repository';
 import { useActiveSession } from '@/data/hooks';
 import type { ActiveExercise, ActiveSession, ActiveSet } from '@/types/models';
+import { newId } from '@/lib/id';
 import { makeActiveExercise, makeEmptySet, restDeadlineFrom } from './lib';
 
 /**
@@ -197,6 +198,23 @@ export function useLogger() {
 
   const clearRest = useCallback(() => setRestDeadline(null), [setRestDeadline]);
 
+  /** Group this exercise with the next one into a superset. */
+  const supersetWithNext = useCallback(
+    (exId: string) =>
+      update((s) => {
+        const idx = s.exercises.findIndex((e) => e.id === exId);
+        if (idx < 0 || idx >= s.exercises.length - 1) return s;
+        const group = s.exercises[idx].supersetGroup ?? newId();
+        return {
+          ...s,
+          exercises: s.exercises.map((e, i) =>
+            i === idx || i === idx + 1 ? { ...e, supersetGroup: group } : e,
+          ),
+        };
+      }),
+    [update],
+  );
+
   return {
     session,
     // lifecycle
@@ -216,5 +234,6 @@ export function useLogger() {
     // rest
     setRestDeadline,
     clearRest,
+    supersetWithNext,
   };
 }

@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { Calculator, ChevronDown, ChevronUp, GripVertical, Plus, Trash2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Calculator, ChevronDown, ChevronUp, GripVertical, Link2, Plus, StickyNote, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -14,13 +14,16 @@ export interface ExerciseCardProps {
   unit: Unit;
   settings: AppSettings;
   workouts: Workout[];
+  inSuperset?: boolean;
   onPatchSet: (setId: string, patch: Partial<ActiveSet>) => void;
+  onPatchExercise: (patch: Partial<ActiveExercise>) => void;
   onToggleDone: (setId: string, restSeconds: number) => void;
   onAddSet: () => void;
   onRemoveSet: (setId: string) => void;
   onRemoveExercise: () => void;
   onMove: (dir: -1 | 1) => void;
   onOpenPlates: (weightKg: number | null) => void;
+  onSupersetWithNext?: () => void;
 }
 
 /**
@@ -35,14 +38,18 @@ export function ExerciseCard({
   unit,
   settings,
   workouts,
+  inSuperset = false,
   onPatchSet,
+  onPatchExercise,
   onToggleDone,
   onAddSet,
   onRemoveSet,
   onRemoveExercise,
   onMove,
   onOpenPlates,
+  onSupersetWithNext,
 }: ExerciseCardProps) {
+  const [noteOpen, setNoteOpen] = useState(Boolean(exercise.note));
   const previous = useMemo(
     () => previousSetsFor(workouts, exercise.exerciseId),
     [workouts, exercise.exerciseId],
@@ -53,18 +60,36 @@ export function ExerciseCard({
   const restSeconds = exercise.restSeconds ?? settings.defaultRestSeconds;
   // Weight to seed the plate calculator: the first set with a logged weight.
   const plateWeight = exercise.sets.find((s) => s.weightKg != null)?.weightKg ?? null;
+  const hasNote = Boolean(exercise.note?.trim());
 
   return (
-    <Card className="gap-3 py-4">
+    <Card className={cn('gap-3 py-4', inSuperset && 'border-0 shadow-none')}>
       {/* Header */}
       <div className="flex items-center gap-2 px-4">
         <span className="hidden text-muted-foreground/50 sm:block" aria-hidden>
           <GripVertical className="size-4" strokeWidth={1.75} />
         </span>
-        <h3 className="min-w-0 flex-1 truncate text-base font-semibold tracking-tight text-foreground">
-          {exercise.rawName}
-        </h3>
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-base font-semibold tracking-tight text-foreground">
+            {exercise.rawName}
+          </h3>
+          {hasNote && !noteOpen ? (
+            <p className="truncate text-xs text-muted-foreground" title={exercise.note}>
+              {exercise.note}
+            </p>
+          ) : null}
+        </div>
         <div className="flex shrink-0 items-center gap-0.5">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => setNoteOpen((o) => !o)}
+            aria-label={noteOpen ? 'Hide note' : 'Add note'}
+            aria-pressed={noteOpen || hasNote}
+            className={cn((noteOpen || hasNote) && 'text-highlight')}
+          >
+            <StickyNote className="size-4" strokeWidth={1.75} />
+          </Button>
           <Button
             variant="ghost"
             size="icon-sm"
@@ -73,6 +98,16 @@ export function ExerciseCard({
           >
             <Calculator className="size-4" strokeWidth={1.75} />
           </Button>
+          {onSupersetWithNext ? (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={onSupersetWithNext}
+              aria-label="Superset with next exercise"
+            >
+              <Link2 className="size-4" strokeWidth={1.75} />
+            </Button>
+          ) : null}
           <Button
             variant="ghost"
             size="icon-sm"
@@ -102,6 +137,25 @@ export function ExerciseCard({
           </Button>
         </div>
       </div>
+
+      {noteOpen ? (
+        <div className="px-4">
+          <label className="sr-only" htmlFor={`note-${exercise.id}`}>
+            Note for {exercise.rawName}
+          </label>
+          <textarea
+            id={`note-${exercise.id}`}
+            value={exercise.note ?? ''}
+            onChange={(e) => onPatchExercise({ note: e.target.value || undefined })}
+            placeholder="Tempo, cues, machine settings…"
+            rows={2}
+            className={cn(
+              'w-full resize-y rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground',
+              'placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
+            )}
+          />
+        </div>
+      ) : null}
 
       {/* Column labels */}
       <div className="grid grid-cols-[1.75rem_3.25rem_minmax(0,1fr)_minmax(0,1fr)_3.5rem_3.75rem] gap-1.5 px-5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground sm:gap-2">
