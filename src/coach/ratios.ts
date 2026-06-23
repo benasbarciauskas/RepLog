@@ -2,8 +2,8 @@ import type { MuscleGroup } from '@/types/models';
 
 /**
  * A strength-ratio standard. `ratio = numerator 1RM / denominator 1RM` (unit-free).
- * Bands + confidence come from the verified research pass:
- * docs/superpowers/research/strength-ratios.md.
+ * Bands + confidence are ratio bands derived from established
+ * strength-standard references.
  */
 export interface RatioRule {
   id: string;

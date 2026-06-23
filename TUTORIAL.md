@@ -187,4 +187,3 @@ no-account, no-cost principle as the web version.
 
 - [`README.md`](README.md) — overview and feature list.
 - [`DESIGN.md`](DESIGN.md) — the visual design system.
-- [`docs/superpowers/specs/2026-06-22-replog-design.md`](docs/superpowers/specs/2026-06-22-replog-design.md) — the product spec.

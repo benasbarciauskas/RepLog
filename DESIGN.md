@@ -1,6 +1,6 @@
 # RepLog Design System
 
-The visual contract for RepLog. Page agents (Wave 2b) build on top of this — keep
+The visual contract for RepLog. Feature pages build on top of this — keep
 everything consistent with the tokens, type scale, motion language, and primitives
 below. Vibe: **athletic, data-forward, premium, dark-first.** Linear-grade cleanliness
 with energy. PRs / 1RMs / weights are the heroes.
@@ -144,7 +144,7 @@ Example: `<LineChartCard title="Bench Press" data={series} xKey="date" dataKey="
 - **Toasts:** `import { toast } from 'sonner'` anywhere; the `<Toaster>` is mounted.
 - **Icons:** lucide-react, `strokeWidth` ~1.75–2. The project already depends on it.
 
-## Routes (for page agents)
+## Routes
 
 | Path             | Component (default export)                     | File |
 | ---------------- | ---------------------------------------------- | ---- |

@@ -5,7 +5,7 @@
 -
 
 ## Scope check (tick all)
-- [ ] Stayed inside my assigned area; did not edit another workstream's files.
+- [ ] Changes are focused; unrelated files were not touched.
 - [ ] Did not move/rename/reorganize root-level entry files. New code is an additive sibling module.
 - [ ] No secrets committed (`.env`, `*.session.json`, `*cookies*`). `git status` is clean of these.
 - [ ] Branch follows `<type>/<slug>` (`feat|fix|chore|refactor|docs`).
