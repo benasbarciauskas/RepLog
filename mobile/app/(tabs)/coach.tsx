@@ -10,6 +10,7 @@ import { brand } from '@/theme';
 
 import { CoachEmptyState } from './_coach/CoachEmptyState';
 import { RecommendationCard } from './_coach/RecommendationCard';
+import { VolumeSection } from './_coach/VolumeSection';
 
 const SUBTITLE =
   'A single Balance Score from how close your lifts sit to healthy strength ratios — plus what to train next.';
@@ -137,6 +138,8 @@ export default function CoachScreen() {
             </View>
           )}
         </View>
+
+        <VolumeSection />
       </ScrollView>
     </SafeAreaView>
   );

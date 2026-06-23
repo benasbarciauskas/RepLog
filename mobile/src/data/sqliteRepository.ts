@@ -6,6 +6,7 @@ import type {
   ActiveSession,
   AppSettings,
   ExerciseDef,
+  Program,
   RawNote,
   Routine,
   SplitCanonical,
@@ -39,6 +40,7 @@ type RepLogExportFile = {
     customExercises?: ExerciseDef[];
     routines?: Routine[];
     settings?: (AppSettings & { id: string })[];
+    programs?: Program[];
   };
 };
 
@@ -75,6 +77,7 @@ class SqliteRepository implements Repository {
       CREATE TABLE IF NOT EXISTS routines (id TEXT PRIMARY KEY NOT NULL, data TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS settings (id TEXT PRIMARY KEY NOT NULL, data TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS activeSession (id TEXT PRIMARY KEY NOT NULL, data TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS programs (id TEXT PRIMARY KEY NOT NULL, data TEXT NOT NULL);
     `);
   }
 
@@ -221,13 +224,28 @@ class SqliteRepository implements Repository {
     this.putRow('settings', { ...s, id: SETTINGS_KEY });
   }
 
+  async getActiveProgram(): Promise<Program | undefined> {
+    const programs = this.listRows<Program>('programs');
+    if (programs.length === 0) return undefined;
+    return [...programs].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+  }
+
+  async saveProgram(p: Program): Promise<void> {
+    this.putRow('programs', p);
+  }
+
+  async deleteProgram(id: string): Promise<void> {
+    this.deleteRow('programs', id);
+  }
+
   private async buildExportPayload(): Promise<RepLogExportFile> {
-    const [notes, workouts, customExercises, routines, settings] = await Promise.all([
+    const [notes, workouts, customExercises, routines, settings, programs] = await Promise.all([
       this.listRows<RawNote>('notes'),
       this.getWorkouts(),
       this.getCustomExercises(),
       this.getRoutines(),
       this.listRows<AppSettings & { id: string }>('settings'),
+      this.listRows<Program>('programs'),
     ]);
 
     const safeSettings = settings.map((s) => {
@@ -240,7 +258,7 @@ class SqliteRepository implements Repository {
       app: EXPORT_APP,
       version: EXPORT_VERSION,
       exportedAt: new Date().toISOString(),
-      data: { notes, workouts, customExercises, routines, settings: safeSettings },
+      data: { notes, workouts, customExercises, routines, settings: safeSettings, programs },
     };
   }
 
@@ -291,10 +309,21 @@ class SqliteRepository implements Repository {
       this.clearTable('settings');
       for (const setting of data.settings) this.putRow('settings', setting);
     }
+    if (data.programs !== undefined) {
+      if (!Array.isArray(data.programs)) throw new Error('Invalid backup: "programs" must be an array');
+      this.clearTable('programs');
+      for (const program of data.programs) this.putRow('programs', program);
+    }
   }
 
   async clearAll(): Promise<void> {
-    throw new Error('not implemented');
+    this.clearTable('notes');
+    this.clearTable('workouts');
+    this.clearTable('customExercises');
+    this.clearTable('routines');
+    this.clearTable('settings');
+    this.clearTable('activeSession');
+    this.clearTable('programs');
   }
 }
 

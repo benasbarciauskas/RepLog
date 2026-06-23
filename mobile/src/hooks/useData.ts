@@ -9,6 +9,7 @@ import type {
   CoachFinding,
   ExerciseBest,
   ExerciseDef,
+  Program,
   Routine,
   Workout,
 } from '@core/types/models';
@@ -131,6 +132,12 @@ export function useRoutines(): Routine[] {
 export function useCustomExercises(): ExerciseDef[] {
   const { data } = useRepoData(() => repository.getCustomExercises(), []);
   return data ?? [];
+}
+
+/** The active training program (most-recently-updated), if any. */
+export function useActiveProgram(): Program | undefined {
+  const { data } = useRepoData(() => repository.getActiveProgram(), []);
+  return data;
 }
 
 /** All-time bests derived live from stored workouts. Recomputes on data change. */
