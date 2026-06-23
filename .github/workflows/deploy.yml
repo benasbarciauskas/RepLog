@@ -1,6 +1,7 @@
 name: deploy
 
-# Build the static app and publish it to GitHub Pages on every push to main.
+# Build stable + optional beta channels and publish a combined artifact to GitHub Pages.
+# Stable: /RepLog/   Beta: /RepLog/beta/ (when the beta branch exists)
 on:
   push:
     branches: [main]
@@ -25,12 +26,53 @@ jobs:
         with:
           node-version: '20'
       - run: npm ci
-      - name: Build (Pages base path)
+      - name: Build stable (Pages base path)
         run: npm run build
         env:
           VITE_BASE: /RepLog/
+      - name: Check for beta branch
+        id: beta-branch
+        run: |
+          if git ls-remote --exit-code --heads origin beta >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Beta branch found."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Beta branch not found; deploying stable only."
+          fi
+      - uses: actions/checkout@v4
+        if: steps.beta-branch.outputs.exists == 'true'
+        continue-on-error: true
+        id: beta-checkout
+        with:
+          ref: beta
+          path: beta-src
+      - name: Install beta dependencies
+        if: steps.beta-branch.outputs.exists == 'true' && steps.beta-checkout.outcome == 'success'
+        continue-on-error: true
+        id: beta-install
+        working-directory: beta-src
+        run: npm ci
+      - name: Build beta (Pages base path)
+        if: steps.beta-branch.outputs.exists == 'true' && steps.beta-install.outcome == 'success'
+        continue-on-error: true
+        id: beta-build
+        working-directory: beta-src
+        run: npm run build
+        env:
+          VITE_BASE: /RepLog/beta/
+      - name: Merge beta build into artifact
+        if: steps.beta-branch.outputs.exists == 'true' && steps.beta-build.outcome == 'success'
+        continue-on-error: true
+        run: |
+          mkdir -p dist/beta
+          cp -r beta-src/dist/* dist/beta/
       - name: SPA fallback for deep links
-        run: cp dist/index.html dist/404.html
+        run: |
+          cp dist/index.html dist/404.html
+          if [ -f dist/beta/index.html ]; then
+            cp dist/beta/index.html dist/beta/404.html
+          fi
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
