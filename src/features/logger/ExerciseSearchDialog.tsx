@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { Plus, Search } from 'lucide-react';
 import {
   Dialog,
@@ -10,7 +11,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { createCatalog } from '@/parser/catalog';
-import { newId } from '@/lib/id';
+import { db } from '@/data/db';
+import { repository } from '@/data/repository';
 import { cn } from '@/lib/utils';
 import type { ExerciseDef } from '@/types/models';
 
@@ -26,9 +28,13 @@ export interface ExerciseSearchDialogProps {
   onPick: (pick: ExercisePick) => void;
 }
 
-/** Build the catalog once per mount — it's pure and built-in only. */
+/**
+ * Catalog of built-ins plus the user's persisted custom exercises (live). New
+ * custom exercises are reusable: once added they show up in every future search.
+ */
 function useCatalog() {
-  return useMemo(() => createCatalog(), []);
+  const custom = useLiveQuery(() => db.customExercises.toArray(), [], []);
+  return useMemo(() => createCatalog(custom), [custom]);
 }
 
 function humanCategory(c: ExerciseDef['category']): string {
@@ -79,6 +85,26 @@ export function ExerciseSearchDialog({ open, onOpenChange, onPick }: ExerciseSea
     onOpenChange(false);
   }
 
+  /**
+   * Persist a typed-in name as a reusable custom exercise, then pick it. The id
+   * scheme is `custom:<slug>`; `addCustomExercise` puts by id so a repeat add of
+   * the same name is idempotent (no duplicate row, no duplicate catalog entry).
+   */
+  async function createAndPickCustom(name: string) {
+    const slug = slugify(name);
+    const id = `custom:${slug}`;
+    await repository.addCustomExercise({
+      id,
+      canonicalName: name,
+      aliases: [name.toLowerCase()],
+      category: 'push',
+      pattern: 'isolation',
+      primaryMuscles: [],
+      secondaryMuscles: [],
+    });
+    pick({ exerciseId: id, rawName: name });
+  }
+
   return (
     <Dialog
       open={open}
@@ -116,9 +142,7 @@ export function ExerciseSearchDialog({ open, onOpenChange, onPick }: ExerciseSea
             <li>
               <button
                 type="button"
-                onClick={() =>
-                  pick({ exerciseId: `unknown:${slugify(trimmed)}`, rawName: trimmed })
-                }
+                onClick={() => void createAndPickCustom(trimmed)}
                 className={cn(
                   'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors',
                   'hover:bg-surface-elevated focus-visible:bg-surface-elevated focus-visible:outline-none',
@@ -174,5 +198,17 @@ function slugify(name: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
-  return base || newId(6);
+  // Deterministic fallback (e.g. an emoji-only name slugs to ''): hash the
+  // lowercased name so the same input always yields the same id — custom
+  // exercises must persist + de-dupe by a stable `custom:<slug>` key.
+  return base || `x${hashName(name.trim().toLowerCase())}`;
+}
+
+/** Small stable string hash (djb2) → base36, for deterministic slug fallback. */
+function hashName(s: string): string {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) {
+    h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  }
+  return (h >>> 0).toString(36);
 }
