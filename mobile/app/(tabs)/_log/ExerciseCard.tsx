@@ -151,8 +151,19 @@ export function ExerciseCard({
     [workouts, exercise.exerciseId],
   );
 
+  const workingIndexBySetId = useMemo(() => {
+    const map = new Map<string, number>();
+    let workingIdx = -1;
+    for (const set of exercise.sets) {
+      if (!set.isWarmup) {
+        workingIdx += 1;
+        map.set(set.id, workingIdx);
+      }
+    }
+    return map;
+  }, [exercise.sets]);
+
   const restSeconds = exercise.restSeconds ?? settings.defaultRestSeconds;
-  let workingIdx = -1;
   const weightLabel = unit === 'lb' ? 'lb' : 'kg';
 
   return (
@@ -190,8 +201,11 @@ export function ExerciseCard({
 
       {exercise.sets.map((set, i) => {
         const number = workingSetNumber(exercise.sets, i);
-        if (!set.isWarmup) workingIdx += 1;
-        const prev = set.isWarmup ? null : (previous[workingIdx] ?? null);
+        const workingIdx = workingIndexBySetId.get(set.id);
+        const prev =
+          set.isWarmup || workingIdx === undefined
+            ? null
+            : (previous[workingIdx] ?? null);
 
         return (
           <SetRow

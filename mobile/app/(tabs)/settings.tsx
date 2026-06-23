@@ -65,8 +65,7 @@ export default function SettingsScreen() {
     setExporting(true);
     setExportFallbackJson(null);
     try {
-      const blob = await repository.exportData();
-      const json = await blob.text();
+      const json = await repository.exportJson();
       const date = new Date().toISOString().slice(0, 10);
       await Share.share({
         message: json,
@@ -74,8 +73,7 @@ export default function SettingsScreen() {
       });
     } catch (err) {
       try {
-        const blob = await repository.exportData();
-        const json = await blob.text();
+        const json = await repository.exportJson();
         setExportFallbackJson(json);
       } catch {
         Alert.alert(
@@ -415,7 +413,7 @@ function SegmentedControl<T extends string>({
   compact,
 }: {
   options: { value: T; label: string }[];
-  value: T;
+  value: T | '';
   onChange: (v: T) => void;
   compact?: boolean;
 }) {

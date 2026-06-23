@@ -144,7 +144,10 @@ function ActiveWorkout({ logger }: { logger: ReturnType<typeof useLogger> }) {
 
   async function handleFinish() {
     await logger.persistNow(session);
-    await repository.finishActiveSession();
+    const started = new Date(session.startedAt);
+    const tzOffsetMs = started.getTimezoneOffset() * 60_000;
+    const date = new Date(started.getTime() - tzOffsetMs).toISOString().slice(0, 10);
+    await repository.finishActiveSession({ date });
     refreshData();
     router.replace('/');
   }

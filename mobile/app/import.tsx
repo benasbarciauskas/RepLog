@@ -42,7 +42,10 @@ function parsedToWorkouts(parsed: ParsedWorkout[]): Workout[] {
     blockId: null,
     sourceNoteId: '',
     createdAt: now,
-    exercises: w.exercises,
+    exercises: w.exercises.map((e) => ({
+      ...e,
+      sets: e.sets.map((s) => ({ ...s })),
+    })),
   }));
 }
 

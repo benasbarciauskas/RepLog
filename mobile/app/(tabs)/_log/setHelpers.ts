@@ -12,8 +12,9 @@ export function displayNum(n: number | null, unit: Unit): string {
 export function parseToKg(raw: string, unit: Unit): number | null {
   if (raw.trim() === '') return null;
   const v = Number(raw);
-  if (!Number.isFinite(v)) return null;
-  return unit === 'lb' ? lbToKg(v) : v;
+  if (!Number.isFinite(v) || v < 0) return null;
+  const kg = unit === 'lb' ? lbToKg(v) : v;
+  return Math.max(0, kg);
 }
 
 export function previousLabel(previous: PreviousSet | null, unit: Unit): string {

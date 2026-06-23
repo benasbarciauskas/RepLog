@@ -142,6 +142,18 @@ npm run preview      # optional: preview the production build locally
 
 Then deploy the contents of `/dist` to any static host (object storage + CDN, a static-site host, GitHub Pages, or a plain web server). Because there's no server-side component, there's nothing else to provision.
 
+### Option 4 — Native app (Expo)
+
+A native iOS/Android build lives in [`mobile/`](mobile/) — Expo + expo-router, sharing this repo's parser, analytics, and coach logic, with on-device `expo-sqlite` storage.
+
+```bash
+cd mobile
+npm install
+npx expo start        # scan the QR code with Expo Go on your phone
+```
+
+See **[TUTORIAL.md → Native app via Expo](TUTORIAL.md)** for the Expo Go workflow and building/submitting a real binary with EAS (expo.dev).
+
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## 🧰 Tech stack
@@ -152,9 +164,10 @@ Then deploy the contents of `/dist` to any static host (object storage + CDN, a 
 | Build            | [Vite 7](https://vitejs.dev/), [vite-plugin-pwa](https://vite-pwa-org.netlify.app/) |
 | Styling          | [Tailwind CSS v4](https://tailwindcss.com/), [shadcn/ui](https://ui.shadcn.com/) |
 | Charts           | [Recharts](https://recharts.org/)                              |
-| Local data       | [Dexie](https://dexie.org/) over IndexedDB                      |
+| Local data       | [Dexie](https://dexie.org/) over IndexedDB (web), [expo-sqlite](https://docs.expo.dev/versions/latest/sdk/sqlite/) (native) |
 | OCR              | [Tesseract.js](https://tesseract.projectnaptha.com/)           |
-| Delivery         | Installable PWA, deployed as a static site                      |
+| Native app       | [Expo](https://expo.dev/) + [expo-router](https://docs.expo.dev/router/introduction/), [NativeWind](https://www.nativewind.dev/) |
+| Delivery         | Installable PWA (static site) + native iOS/Android via Expo     |
 
 Everything runs client-side. The OCR engine, the parser, the charts, and the coach all execute in the browser.
 
@@ -162,8 +175,9 @@ Everything runs client-side. The OCR engine, the parser, the charts, and the coa
 
 ## 🗺️ Roadmap
 
-- [ ] **Native mobile app** (Expo / React Native) that reuses the same on-device import, parsing, and coaching logic
-- [ ] Encrypted local export / import for moving data between devices
+- [x] **Native mobile app** (Expo / React Native) — core screens shipped in [`mobile/`](mobile/), reusing the same on-device import, parsing, and coaching logic
+- [x] Local **export / import** (JSON) for moving data between devices — on web and mobile; encrypted sync is next
+- [ ] Optional cross-device sync (end-to-end encrypted)
 - [ ] More import formats and smarter exercise-name normalization
 - [ ] Additional coach standards and goal-based recommendations
 - [ ] Richer progress views (PR timelines, per-block comparisons)

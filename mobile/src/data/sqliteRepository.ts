@@ -42,8 +42,8 @@ type RepLogExportFile = {
   };
 };
 
-function todayISO(): string {
-  const d = new Date();
+function dateFromISO(iso: string): string {
+  const d = new Date(iso);
   const tzOffsetMs = d.getTimezoneOffset() * 60_000;
   return new Date(d.getTime() - tzOffsetMs).toISOString().slice(0, 10);
 }
@@ -156,6 +156,7 @@ class SqliteRepository implements Repository {
   async finishActiveSession(meta?: {
     bodyweightKg?: number | null;
     splitCanonical?: SplitCanonical;
+    date?: string;
   }): Promise<Workout | undefined> {
     const session = await this.getActiveSession();
     if (!session) return undefined;
@@ -182,7 +183,7 @@ class SqliteRepository implements Repository {
 
     const workout: Workout = {
       id: newId(),
-      date: todayISO(),
+      date: meta?.date ?? dateFromISO(session.startedAt),
       dateConfidence: 'high',
       bodyweightKg: meta?.bodyweightKg ?? session.bodyweightKg ?? null,
       splitCanonical: meta?.splitCanonical ?? session.splitCanonical ?? 'unknown',
@@ -220,7 +221,7 @@ class SqliteRepository implements Repository {
     this.putRow('settings', { ...s, id: SETTINGS_KEY });
   }
 
-  async exportData(): Promise<Blob> {
+  private async buildExportPayload(): Promise<RepLogExportFile> {
     const [notes, workouts, customExercises, routines, settings] = await Promise.all([
       this.listRows<RawNote>('notes'),
       this.getWorkouts(),
@@ -235,14 +236,22 @@ class SqliteRepository implements Repository {
       return rest;
     });
 
-    const payload: RepLogExportFile = {
+    return {
       app: EXPORT_APP,
       version: EXPORT_VERSION,
       exportedAt: new Date().toISOString(),
       data: { notes, workouts, customExercises, routines, settings: safeSettings },
     };
+  }
 
+  async exportData(): Promise<Blob> {
+    const payload = await this.buildExportPayload();
     return new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  }
+
+  async exportJson(): Promise<string> {
+    const payload = await this.buildExportPayload();
+    return JSON.stringify(payload, null, 2);
   }
 
   async importData(json: string | object): Promise<void> {
@@ -289,4 +298,4 @@ class SqliteRepository implements Repository {
   }
 }
 
-export const repository: Repository = new SqliteRepository();
+export const repository = new SqliteRepository();
