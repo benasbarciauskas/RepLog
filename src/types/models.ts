@@ -214,4 +214,6 @@ export interface AppSettings {
   aiApiKey?: string;
   /** OpenRouter model id for AI parse (defaults to a free tier model). */
   aiModel?: string;
+  /** OpenRouter model id for vision screenshot import (must support images). */
+  aiVisionModel?: string;
 }

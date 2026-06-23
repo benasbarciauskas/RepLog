@@ -4,11 +4,18 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { PPL_NOTE } from '@/parser/__tests__/fixtures/notes';
 import type { ReviewRouteState } from './types';
 
-const { imageToTextMock, settingsMock, toastError, toastInfo } = vi.hoisted(() => ({
+const {
+  imageToTextMock,
+  settingsMock,
+  toastError,
+  toastInfo,
+  aiParseWorkoutsFromImagesMock,
+} = vi.hoisted(() => ({
   imageToTextMock: vi.fn(async () => ''),
   settingsMock: vi.fn(() => ({})),
   toastError: vi.fn(),
   toastInfo: vi.fn(),
+  aiParseWorkoutsFromImagesMock: vi.fn(),
 }));
 
 // Mock OCR + repository so the page renders without tesseract / IndexedDB.
@@ -29,6 +36,10 @@ vi.mock('sonner', () => ({
 vi.mock('@/data/hooks', () => ({
   useWorkouts: () => [],
   useSettings: () => settingsMock(),
+}));
+vi.mock('@/ai/openrouter', () => ({
+  aiParseWorkouts: vi.fn(),
+  aiParseWorkoutsFromImages: aiParseWorkoutsFromImagesMock,
 }));
 
 // A stub Review screen that surfaces the route-state it received, so the test
@@ -185,5 +196,91 @@ describe('ImportPage', () => {
     await waitFor(() => expect(toastError).toHaveBeenCalled());
     expect(screen.queryByRole('heading', { name: 'Review Stub' })).not.toBeInTheDocument();
     expect(toastInfo).not.toHaveBeenCalled();
+  });
+
+  it('does not render the Read with AI button when no OpenRouter key is set', async () => {
+    await renderImport();
+
+    const input = document.querySelector(
+      'input[type="file"][accept="image/*"]',
+    ) as HTMLInputElement;
+    const file = new File(['pixels'], 'note.png', { type: 'image/png' });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    expect(screen.queryByRole('button', { name: /Read with AI/i })).not.toBeInTheDocument();
+  });
+
+  it('renders the Read with AI button when a key is set and images are staged', async () => {
+    settingsMock.mockReturnValue({ aiApiKey: 'sk-or-test' });
+    await renderImport();
+
+    const input = document.querySelector(
+      'input[type="file"][accept="image/*"]',
+    ) as HTMLInputElement;
+    const file = new File(['pixels'], 'note.png', { type: 'image/png' });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    expect(screen.getByRole('button', { name: /Read with AI/i })).toBeInTheDocument();
+  });
+
+  it('calls aiParseWorkoutsFromImages with data URLs and routes to Review', async () => {
+    const DATA_URL = 'data:image/png;base64,mockdata';
+    const parsedWorkout = {
+      date: '2024-08-26',
+      dateConfidence: 'high' as const,
+      bodyweightKg: null,
+      splitCanonical: 'push' as const,
+      splitRaw: 'push',
+      exercises: [
+        {
+          exerciseId: 'barbell-bench-press',
+          rawName: 'Bench press',
+          unit: 'kg' as const,
+          sets: [{ weightKg: 105, reps: 5, rpe: null, raw: '105x5' }],
+        },
+      ],
+    };
+
+    aiParseWorkoutsFromImagesMock.mockResolvedValue([parsedWorkout]);
+    settingsMock.mockReturnValue({
+      aiApiKey: 'sk-or-test',
+      aiVisionModel: 'meta-llama/llama-3.2-11b-vision-instruct:free',
+    });
+
+    class MockFileReader {
+      onload: ((ev: ProgressEvent<FileReader>) => void) | null = null;
+      result: string | ArrayBuffer | null = DATA_URL;
+      readAsDataURL() {
+        queueMicrotask(() => {
+          this.onload?.({ target: this } as unknown as ProgressEvent<FileReader>);
+        });
+      }
+    }
+    vi.stubGlobal('FileReader', MockFileReader);
+
+    await renderImport();
+
+    const input = document.querySelector(
+      'input[type="file"][accept="image/*"]',
+    ) as HTMLInputElement;
+    const file = new File(['pixels'], 'note.png', { type: 'image/png' });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    fireEvent.click(screen.getByRole('button', { name: /Read with AI/i }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Review Stub' })).toBeInTheDocument(),
+    );
+
+    expect(aiParseWorkoutsFromImagesMock).toHaveBeenCalledWith(
+      [DATA_URL],
+      {
+        apiKey: 'sk-or-test',
+        model: 'meta-llama/llama-3.2-11b-vision-instruct:free',
+      },
+      expect.anything(),
+    );
+    expect(screen.getByTestId('workout-count').textContent).toBe('1');
+    expect(screen.getByTestId('tag').textContent).toBe('replog:review');
   });
 });

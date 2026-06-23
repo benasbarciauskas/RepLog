@@ -20,6 +20,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultRestSeconds: 120,
   unit: 'kg',
   aiModel: 'meta-llama/llama-3.3-70b-instruct:free',
+  // Free vision-capable model on OpenRouter
+  aiVisionModel: 'meta-llama/llama-3.2-11b-vision-instruct:free',
 };
 
 /** Today's date as an ISO `yyyy-mm-dd` string (local time). */
@@ -38,6 +40,7 @@ export function stripSettingsKey(stored: AppSettings & { id: string }): AppSetti
     unit: stored.unit,
     ...(stored.aiApiKey !== undefined ? { aiApiKey: stored.aiApiKey } : {}),
     ...(stored.aiModel !== undefined ? { aiModel: stored.aiModel } : {}),
+    ...(stored.aiVisionModel !== undefined ? { aiVisionModel: stored.aiVisionModel } : {}),
   };
 }
 
