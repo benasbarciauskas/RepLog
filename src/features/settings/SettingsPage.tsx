@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { ExternalLink, Plus, X } from 'lucide-react';
+import { Download, ExternalLink, Plus, Upload, X } from 'lucide-react';
+import { toast } from 'sonner';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +27,7 @@ export default function SettingsPage() {
 
   // Local draft for the "add a plate" input.
   const [newPlate, setNewPlate] = useState('');
+  const [exporting, setExporting] = useState(false);
 
   function save(patch: Partial<AppSettings>) {
     void repository.saveSettings({ ...settings, ...patch });
@@ -45,6 +47,38 @@ export default function SettingsPage() {
 
   function removePlate(plate: number) {
     save({ availablePlatesKg: settings.availablePlatesKg.filter((p) => p !== plate) });
+  }
+
+  async function handleExport() {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const blob = await repository.exportData();
+      const url = URL.createObjectURL(blob);
+      const date = new Date().toISOString().slice(0, 10);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `replog-backup-${date}.json`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not export data');
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  async function handleImport(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    try {
+      const text = await file.text();
+      await repository.importData(text);
+      toast.success('Data imported');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not import backup');
+    }
   }
 
   return (
@@ -209,6 +243,38 @@ export default function SettingsPage() {
           description="Stable is the live release. Beta is the preview build — the latest, from the beta branch."
         >
           <ChannelControl channel={channel} />
+        </SettingsSection>
+
+        {/* Backup & restore */}
+        <SettingsSection
+          title="Backup & restore"
+          description="Data is stored only in this browser — export to back up or move it to another device."
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleExport}
+              disabled={exporting}
+            >
+              <Download className="size-4" strokeWidth={2} aria-hidden />
+              {exporting ? 'Exporting…' : 'Export data'}
+            </Button>
+            <div className="relative">
+              <Button type="button" variant="outline" size="sm" className="pointer-events-none">
+                <Upload className="size-4" strokeWidth={2} aria-hidden />
+                Import data
+              </Button>
+              <input
+                type="file"
+                accept="application/json"
+                aria-label="Import backup file"
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                onChange={handleImport}
+              />
+            </div>
+          </div>
         </SettingsSection>
       </div>
     </div>

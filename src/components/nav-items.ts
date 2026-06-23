@@ -22,7 +22,7 @@ export interface NavItem {
 /**
  * Navigation model. `primary` items appear in the mobile bottom tab bar;
  * the rest stay reachable from the desktop sidebar and an "More" overflow sheet
- * on mobile. Exported so page agents can reference the route map.
+ * on mobile. Exported as the shared route map for navigation UI.
  *
  * Mobile primary tabs (4 + a centred Log action): Dashboard, Coach, [Log],
  * History, More. Log gets the prominent centre slot (the core v1.1 action).
