@@ -77,6 +77,29 @@ describe('createCatalog().match', () => {
     expect(cat.match('pullups')?.id).toBe('pull-up');
     expect(cat.match('weighted pullups')?.id).toBe('weighted-pull-up');
   });
+
+  it('resolves common gym shorthand and abbreviations', () => {
+    expect(cat.match('OHP')?.id).toBe('overhead-press');
+    expect(cat.match('RDL')?.id).toBe('romanian-deadlift');
+    expect(cat.match('BB squat')?.id).toBe('back-squat');
+    expect(cat.match('DB row')?.id).toBe('dumbbell-row');
+    expect(cat.match('pull ups')?.id).toBe('pull-up');
+    expect(cat.match('chin ups')?.id).toBe('pull-up');
+    expect(cat.match('lat pulldown')?.id).toBe('lat-pulldown');
+    expect(cat.match('pulldowns')?.id).toBe('lat-pulldown');
+    expect(cat.match('leg press')?.id).toBe('leg-press');
+    expect(cat.match('hack squat')?.id).toBe('hack-squat');
+    expect(cat.match('skullcrusher')?.id).toBe('skull-crusher');
+    expect(cat.match('pushdown')?.id).toBe('tricep-pushdown');
+    expect(cat.match('lateral raise')?.id).toBe('lateral-raise');
+    expect(cat.match('side raise')?.id).toBe('lateral-raise');
+    expect(cat.match('rear delt fly')?.id).toBe('rear-delt-fly');
+    expect(cat.match('face pull')?.id).toBe('face-pull');
+    expect(cat.match('hammer curl')?.id).toBe('hammer-curl');
+    expect(cat.match('preacher curl')?.id).toBe('preacher-curl');
+    expect(cat.match('calf raise')?.id).toBe('calf-raise');
+    expect(cat.match('hip thrust')?.id).toBe('hip-thrust');
+  });
 });
 
 describe('createCatalog() custom + add', () => {

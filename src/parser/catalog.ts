@@ -31,6 +31,9 @@ export const BUILTIN_EXERCISES: ExerciseDef[] = [
       'barbell bench press',
       'barbell bench',
       'bb bench',
+      'bb bench press',
+      'barbell bp',
+      'bp',
     ],
     category: 'push',
     pattern: 'horizontal-press',
@@ -110,14 +113,17 @@ export const BUILTIN_EXERCISES: ExerciseDef[] = [
     aliases: [
       'ohp',
       'overhead press',
+      'oh press',
       'standing press',
       'military press',
       'ohp seated',
       'seated ohp',
       'shoulder press',
-      'press',
       'barbell shoulder press',
       'standing overhead press',
+      'bb ohp',
+      'bb press',
+      'strict press',
     ],
     category: 'push',
     pattern: 'vertical-press',
@@ -162,11 +168,13 @@ export const BUILTIN_EXERCISES: ExerciseDef[] = [
     aliases: [
       'rear delt fly',
       'rear delt flys',
+      'rear delt flies',
       'reverse fly',
       'reverse flys',
+      'reverse flies',
       'rear delt raise',
-      'face pull',
-      'face pulls',
+      'rear delt raises',
+      'bent over rear delt fly',
     ],
     category: 'pull',
     pattern: 'isolation',
@@ -268,6 +276,15 @@ export const BUILTIN_EXERCISES: ExerciseDef[] = [
     secondaryMuscles: ['biceps', 'upper-back', 'rear-delts'],
   },
   {
+    id: 'face-pull',
+    canonicalName: 'Face Pull',
+    aliases: ['face pull', 'face pulls', 'cable face pull', 'rope face pull'],
+    category: 'pull',
+    pattern: 'horizontal-pull',
+    primaryMuscles: ['rear-delts', 'upper-back'],
+    secondaryMuscles: ['traps'],
+  },
+  {
     id: 'lat-pulldown',
     canonicalName: 'Lat Pulldown',
     aliases: [
@@ -289,7 +306,16 @@ export const BUILTIN_EXERCISES: ExerciseDef[] = [
   {
     id: 'back-squat',
     canonicalName: 'Back Squat',
-    aliases: ['squat', 'back squat', 'barbell squat', 'squats', 'high bar squat', 'low bar squat'],
+    aliases: [
+      'squat',
+      'squats',
+      'back squat',
+      'barbell squat',
+      'bb squat',
+      'high bar squat',
+      'low bar squat',
+      'backsquat',
+    ],
     category: 'legs',
     pattern: 'squat',
     primaryMuscles: ['quads', 'glutes'],
@@ -305,9 +331,18 @@ export const BUILTIN_EXERCISES: ExerciseDef[] = [
     secondaryMuscles: ['glutes', 'abs', 'upper-back'],
   },
   {
+    id: 'hack-squat',
+    canonicalName: 'Machine Hack Squat',
+    aliases: ['hack squat', 'hack squats', 'machine hack squat', 'hack squat machine'],
+    category: 'legs',
+    pattern: 'squat',
+    primaryMuscles: ['quads', 'glutes'],
+    secondaryMuscles: ['hamstrings'],
+  },
+  {
     id: 'leg-press',
     canonicalName: 'Leg Press',
-    aliases: ['leg press', 'leg presses', 'machine leg press'],
+    aliases: ['leg press', 'leg presses', 'machine leg press', 'legpress'],
     category: 'legs',
     pattern: 'squat',
     primaryMuscles: ['quads', 'glutes'],
@@ -383,7 +418,15 @@ export const BUILTIN_EXERCISES: ExerciseDef[] = [
   {
     id: 'deadlift',
     canonicalName: 'Deadlift',
-    aliases: ['deadlift', 'deadlifts', 'conventional deadlift', 'dl', 'barbell deadlift'],
+    aliases: [
+      'deadlift',
+      'deadlifts',
+      'conventional deadlift',
+      'dl',
+      'barbell deadlift',
+      'bb deadlift',
+      'bb dl',
+    ],
     category: 'pull',
     pattern: 'hinge',
     primaryMuscles: ['hamstrings', 'glutes', 'lower-back'],
@@ -443,10 +486,26 @@ export const BUILTIN_EXERCISES: ExerciseDef[] = [
       'dumbbell curls',
       'db curl',
       'db curls',
-      'hammer curl',
-      'hammer curls',
       'incline curl',
     ],
+    category: 'pull',
+    pattern: 'isolation',
+    primaryMuscles: ['biceps'],
+    secondaryMuscles: ['forearms'],
+  },
+  {
+    id: 'hammer-curl',
+    canonicalName: 'Hammer Curl',
+    aliases: ['hammer curl', 'hammer curls', 'db hammer curl', 'dumbbell hammer curl'],
+    category: 'pull',
+    pattern: 'isolation',
+    primaryMuscles: ['biceps'],
+    secondaryMuscles: ['forearms'],
+  },
+  {
+    id: 'preacher-curl',
+    canonicalName: 'Preacher Curl',
+    aliases: ['preacher curl', 'preacher curls', 'scott curl', 'ez bar preacher curl'],
     category: 'pull',
     pattern: 'isolation',
     primaryMuscles: ['biceps'],
@@ -526,7 +585,37 @@ export const BUILTIN_EXERCISES: ExerciseDef[] = [
 
 /** Normalize a raw exercise name to its alias-lookup key. */
 function normalize(raw: string): string {
-  return raw.trim().toLowerCase().replace(/\s+/g, ' ');
+  return raw
+    .trim()
+    .toLowerCase()
+    .replace(/['']/g, '')
+    .replace(/\s+/g, ' ');
+}
+
+/** Expand common gym shorthand (bb/db) into lookup variants. */
+function lookupKeys(raw: string): string[] {
+  const key = normalize(raw);
+  if (!key) return [];
+
+  const keys = new Set<string>([key]);
+
+  const bb = key.replace(/^bb\s+/, 'barbell ');
+  if (bb !== key) {
+    keys.add(bb);
+    keys.add(key.slice(3).trim());
+  }
+
+  const db = key.replace(/^db\s+/, 'dumbbell ');
+  if (db !== key) {
+    keys.add(db);
+    keys.add(key.slice(3).trim());
+  }
+
+  // "pullups" -> "pull ups", "chinups" -> "chin ups"
+  const spaced = key.replace(/(pull|chin)(ups?)\b/, '$1 $2');
+  if (spaced !== key) keys.add(spaced);
+
+  return [...keys];
 }
 
 class Catalog implements ExerciseCatalog {
@@ -570,19 +659,26 @@ class Catalog implements ExerciseCatalog {
   }
 
   match(rawName: string): ExerciseDef | null {
-    const key = normalize(rawName);
-    if (!key) return null;
+    const keys = lookupKeys(rawName);
+    if (keys.length === 0) return null;
 
-    // 1. exact alias / canonical-name hit
-    const exact = this.aliasIndex.get(key);
-    if (exact) return exact;
-
-    // 2. fuzzy fallback
-    const hits = this.fuse.search(key, { limit: 1 });
-    if (hits.length > 0 && hits[0].score !== undefined && hits[0].score <= 0.3) {
-      return hits[0].item.def;
+    // 1. exact alias / canonical-name hit (bb/db expanded variants first)
+    for (const key of keys) {
+      const exact = this.aliasIndex.get(key);
+      if (exact) return exact;
     }
-    return null;
+
+    // 2. fuzzy fallback — try each expanded key, keep best score
+    let best: ExerciseDef | null = null;
+    let bestScore = 0.3;
+    for (const key of keys) {
+      const hits = this.fuse.search(key, { limit: 1 });
+      if (hits.length > 0 && hits[0].score !== undefined && hits[0].score < bestScore) {
+        bestScore = hits[0].score;
+        best = hits[0].item.def;
+      }
+    }
+    return best;
   }
 
   all(): ExerciseDef[] {
