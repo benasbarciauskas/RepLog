@@ -1,3 +1,6 @@
+/** Flip to true once the /RepLog/beta/ build is published. */
+export const BETA_AVAILABLE = false;
+
 /** Release channel the app is running as. */
 export type Channel = 'stable' | 'beta' | 'local';
 

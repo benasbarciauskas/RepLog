@@ -63,18 +63,15 @@ describe('SettingsPage', () => {
     );
   });
 
-  it('reflects the BASE_URL channel — local build shows both hosted links', async () => {
-    // In the test environment import.meta.env.BASE_URL is '/', i.e. a local build,
-    // which renders Stable + Beta as links (no forced selection).
+  it('reflects the BASE_URL channel — local build shows Stable link while beta is unpublished', async () => {
+    // In the test environment import.meta.env.BASE_URL is '/', i.e. a local build.
     expect(detectChannel(import.meta.env.BASE_URL)).toBe('local');
     await renderSettings();
     expect(screen.getByRole('link', { name: /stable/i })).toHaveAttribute(
       'href',
       'https://benasbarciauskas.github.io/RepLog/',
     );
-    expect(screen.getByRole('link', { name: /beta/i })).toHaveAttribute(
-      'href',
-      'https://benasbarciauskas.github.io/RepLog/beta/',
-    );
+    expect(screen.queryByRole('link', { name: /beta/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/beta channel coming soon/i)).toBeInTheDocument();
   });
 });

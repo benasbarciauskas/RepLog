@@ -9,7 +9,7 @@ import { useSettings } from '@/data/hooks';
 import { repository } from '@/data/repository';
 import { formatWeight } from '@/lib/units';
 import type { AppSettings, Unit } from '@/types/models';
-import { CHANNEL_URLS, type Channel, detectChannel } from './channel';
+import { BETA_AVAILABLE, CHANNEL_URLS, type Channel, detectChannel } from './channel';
 
 // --- Plate presets -----------------------------------------------------------
 
@@ -240,7 +240,11 @@ export default function SettingsPage() {
         {/* Release channel */}
         <SettingsSection
           title="Release channel"
-          description="Stable is the live release. Beta is the preview build — the latest, from the beta branch."
+          description={
+            BETA_AVAILABLE
+              ? 'Stable is the live release. Beta is the preview build — the latest, from the beta branch.'
+              : 'Stable is the live release. A beta preview channel is coming soon.'
+          }
         >
           <ChannelControl channel={channel} />
         </SettingsSection>
@@ -281,8 +285,12 @@ export default function SettingsPage() {
   );
 }
 
+function BetaComingSoonNote() {
+  return <p className="text-sm text-muted-foreground">Beta channel coming soon.</p>;
+}
+
 function ChannelControl({ channel }: { channel: Channel }) {
-  // Local build: show both links without forcing a selection.
+  // Local build: show hosted links without forcing a selection.
   if (channel === 'local') {
     return (
       <div className="space-y-3">
@@ -296,13 +304,52 @@ function ChannelControl({ channel }: { channel: Channel }) {
               <ExternalLink className="size-3.5" strokeWidth={2} />
             </a>
           </Button>
-          <Button asChild variant="outline" size="sm">
-            <a href={CHANNEL_URLS.beta}>
-              Beta
-              <ExternalLink className="size-3.5" strokeWidth={2} />
-            </a>
-          </Button>
+          {BETA_AVAILABLE ? (
+            <Button asChild variant="outline" size="sm">
+              <a href={CHANNEL_URLS.beta}>
+                Beta
+                <ExternalLink className="size-3.5" strokeWidth={2} />
+              </a>
+            </Button>
+          ) : null}
         </div>
+        {!BETA_AVAILABLE ? <BetaComingSoonNote /> : null}
+      </div>
+    );
+  }
+
+  // Beta build while the hosted beta URL is unpublished: keep channel detection,
+  // but only allow switching back to Stable.
+  if (!BETA_AVAILABLE && channel === 'beta') {
+    return (
+      <SegmentedControl
+        ariaLabel="Release channel"
+        options={[
+          { value: 'stable', label: 'Stable' },
+          { value: 'beta', label: 'Beta' },
+        ]}
+        value={channel}
+        onChange={(next: Channel) => {
+          if (next === 'stable') window.location.assign(CHANNEL_URLS.stable);
+        }}
+      />
+    );
+  }
+
+  // Hosted stable while beta is unpublished: read-only Stable, no navigation to beta.
+  if (!BETA_AVAILABLE) {
+    return (
+      <div className="space-y-2">
+        <div
+          role="group"
+          aria-label="Release channel"
+          className="inline-flex items-center gap-1 rounded-lg border border-border bg-surface p-1"
+        >
+          <span className="rounded-md bg-highlight px-3 py-1.5 text-sm font-medium text-highlight-foreground">
+            Stable
+          </span>
+        </div>
+        <BetaComingSoonNote />
       </div>
     );
   }
