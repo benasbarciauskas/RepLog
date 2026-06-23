@@ -24,6 +24,7 @@ export function parseExerciseLine(
   if (!trimmed) return [];
 
   const { name, setText } = splitNameAndSets(trimmed);
+  if (!/[a-z]/i.test(name)) return [];
   if (!setText) return [];
 
   const sets = parseSets(setText);
