@@ -1,4 +1,5 @@
 import type { ExerciseDef, SetEntry, WorkoutExercise } from '@/types/models';
+import { extractRpe, parseToken, roundNum, tokenizePart, weightToKg } from './setToken';
 import type { ExerciseCatalog } from './catalog';
 
 /**
@@ -77,7 +78,17 @@ function splitNameAndSets(line: string): { name: string; setText: string } {
 
 /** Remove a trailing rep-scheme like "5x5" or "3 x 8" from a name segment. */
 function stripSchemeSuffix(name: string): string {
-  return name.replace(/\s+\d+\s*[x×]\s*\d+\s*$/i, '').trim();
+  return stripBodyweightMarker(name.replace(/\s+\d+\s*[x×]\s*\d+\s*$/i, '').trim());
+}
+
+/**
+ * Drop a trailing added-weight marker from a name segment so inline bodyweight
+ * moves resolve: "pull ups +" -> "pull ups", "dips bw+" -> "dips", "dips bw +".
+ * The numeric weight that followed the marker is set data and was already split
+ * off as setText by splitNameAndSets; only the dangling "bw"/"+" remains here.
+ */
+function stripBodyweightMarker(name: string): string {
+  return name.replace(/\s*(?:\bbw\b)?\s*\+\s*$/i, '').trim();
 }
 
 /**
@@ -94,8 +105,56 @@ function stripSchemeSuffix(name: string): string {
  */
 function parseSets(setText: string): SetEntry[] {
   // Normalize: collapse multiple spaces, trim.
-  const text = setText.replace(/\.{2,}|…/g, '').trim();
+  const normalized = setText.replace(/\.{2,}|…/g, '').trim();
+  if (!normalized) return [];
+
+  // Peel a WHOLE-TEXT trailing RPE ("100x5 @8", "...@RPE8") up front so a
+  // trailing `@N` (N <= 10) can never be swallowed by the scheme / drop / @-weight
+  // matchers below as a weight or a set-count (which exploded "100x5 @8" into ~100
+  // phantom sets). The peeled RPE is re-attached to the LAST parsed set after
+  // parsing the remaining text; per-token `@RPE` inside a comma list is still
+  // handled by scanTokens, so multi-set lists keep their own per-set RPE.
+  const { rest: text, rpe: trailingRpe } = extractRpe(normalized);
   if (!text) return [];
+  const result = parseSetsInner(text);
+  if (trailingRpe !== undefined && result.length > 0) {
+    const last = result[result.length - 1];
+    if (last.rpe === undefined) last.rpe = trailingRpe;
+  }
+  return result;
+}
+
+/**
+ * Is a matched `N x M @ W` truly a SETS x REPS @ WEIGHT scheme (n sets of m reps),
+ * and not a single working set `WEIGHTxREPS` with a redundant `@ WEIGHT`? A scheme
+ * has a SMALL set count (<= 12) and a weight that exceeds the set count. Without
+ * this, "100x5 @ 100" matched and exploded into 100 identical sets. Such a string
+ * instead falls through to the per-token scanner (one set of 100x5).
+ */
+function isSetsRepsScheme(m: RegExpMatchArray): boolean {
+  const n = Number.parseInt(m[1], 10); // claimed set count
+  const w = Number.parseFloat(m[3]); // claimed weight
+  return n >= 1 && n <= 12 && w > n;
+}
+
+function parseSetsInner(text: string): SetEntry[] {
+  // 0. SETS x REPS @ WEIGHT scheme: "5x5 @ 100", "3 x 8 @ 100kg".
+  //    Distinguished from the WEIGHT xNxM scheme (1, below) by the trailing
+  //    `@ WEIGHT`: the `@` makes the leading number the SET COUNT, the second
+  //    the reps, and the post-`@` number the weight. lb/lbs converts to kg.
+  const setsRepsAtWeight = text.match(
+    /^(\d+)\s*[x×]\s*(\d+)\s*@\s*(\d+(?:\.\d+)?)\s*(kgs?|kg|lbs?|lb)?\s*$/i,
+  );
+  if (setsRepsAtWeight && isSetsRepsScheme(setsRepsAtWeight)) {
+    const n = Number.parseInt(setsRepsAtWeight[1], 10); // number of sets
+    const m = Number.parseInt(setsRepsAtWeight[2], 10); // reps per set
+    const weight = weightToKg(setsRepsAtWeight[3], setsRepsAtWeight[4]);
+    return Array.from({ length: n }, () => ({
+      weightKg: weight,
+      reps: m,
+      raw: `${setsRepsAtWeight[1]}x${setsRepsAtWeight[2]} @ ${setsRepsAtWeight[3]}`,
+    }));
+  }
 
   // 1. WEIGHT xNxM scheme shorthand at start: "140 x5x5" or "140x5x5".
   //    Matches WEIGHT [unit] x N x M (e.g. "140 x5x5", "60kg x3x8").
@@ -110,6 +169,26 @@ function parseSets(setText: string): SetEntry[] {
       weightKg: weight,
       reps: m,
       raw: `${schemeMatch[1]}x${schemeMatch[2]}x${schemeMatch[3]}`,
+    }));
+  }
+
+  // 1b. Slash / comma DROP-WEIGHTS followed by `x REPS`: "100/90/80 x 5",
+  //     "100,90,80 x 5" = descending weights, each performed for the shared reps
+  //     after the `x`. This is distinct from a standalone slash rep-list
+  //     ("12/10/8" -> reps, format 3 below): the trailing `x N` is the signal
+  //     that the group is WEIGHTS, not reps. Checked BEFORE the slash rep-list
+  //     and the comma token scanner so the trailing `x N` is honored.
+  const dropWeightsX = text.match(
+    /^(\d+(?:\.\d+)?(?:\s*[/,]\s*\d+(?:\.\d+)?)+)\s*(?:kgs?|kg|lbs?|lb)?\s*[x×]\s*(\d+)\s*$/i,
+  );
+  if (dropWeightsX) {
+    const unit = /lbs?\b/i.test(text) ? 'lb' : 'kg';
+    const reps = Number.parseInt(dropWeightsX[2], 10);
+    const weights = dropWeightsX[1].split(/[/,]/).map((w) => w.trim());
+    return weights.map((w) => ({
+      weightKg: weightToKg(w, unit),
+      reps,
+      raw: `${w} x ${reps}`,
     }));
   }
 
@@ -167,12 +246,21 @@ function scanTokens(text: string): SetEntry[] {
       rawTokens.push(part);
       continue;
     }
+    // Multi-word "rich" forms ("100kg for 8 reps", "8 reps x 100kg", "100x5 @8",
+    // "100 x AMRAP") must stay a single token so parseToken sees the whole phrase
+    // — space-splitting would shatter them. A part parseToken recognizes whole is
+    // kept intact; otherwise fall back to the space tokenizer ("25 x12 x15").
+    if (isRichToken(part)) {
+      rawTokens.push(part);
+      continue;
+    }
     // Within a comma segment, split further on spaces — but keep "105x 5" together.
     rawTokens.push(...tokenizePart(part));
   }
 
   const sets: SetEntry[] = [];
   let carriedWeight: number | null = null;
+  let carriedReps: number | null = null;
 
   for (let i = 0; i < rawTokens.length; i++) {
     const token = rawTokens[i];
@@ -190,6 +278,24 @@ function scanTokens(text: string): SetEntry[] {
       continue;
     }
 
+    // DROP-WEIGHT bare number after a weighted set context: a trailing bare value
+    // ("100x5, 90, 80") is a descending DROP WEIGHT (reps inherited), NOT reps,
+    // when it is plausibly a weight rather than a rep count. Heuristic: the value
+    // is > 20 (above any realistic rep count) AND <= the carried weight (a drop
+    // descends). This keeps "125x5, 120x5, 5" — small trailing reps — as reps.
+    if (
+      /^\d+(?:\.\d+)?$/.test(t) &&
+      carriedWeight !== null &&
+      carriedReps !== null
+    ) {
+      const val = roundNum(Number.parseFloat(t));
+      if (val > 20 && val <= carriedWeight) {
+        carriedWeight = val;
+        sets.push({ weightKg: val, reps: carriedReps, raw: token });
+        continue;
+      }
+    }
+
     const parsed = parseToken(t);
     if (!parsed) continue;
     if (parsed.reps === 0) {
@@ -204,15 +310,42 @@ function scanTokens(text: string): SetEntry[] {
     } else if (weight !== null) {
       carriedWeight = weight;
     }
+    if (parsed.reps !== null) carriedReps = parsed.reps;
 
-    sets.push({
+    const set: SetEntry = {
       weightKg: weight,
-      reps: parsed.reps,
+      reps: parsed.isAmrap ? (null as unknown as number) : (parsed.reps as number),
       raw: token,
-    });
+    };
+    if (parsed.rpe !== undefined) set.rpe = parsed.rpe;
+    sets.push(set);
   }
 
   return sets;
+}
+
+/**
+ * Does parseToken recognize this whole space-containing part as ONE set? Used so
+ * multi-word forms ("100kg for 8", "8 reps x 100", "100x5 @8") are kept intact
+ * rather than space-split. A part with no spaces is left to the normal path.
+ */
+function isRichToken(part: string): boolean {
+  const p = part.trim();
+  if (!/\s/.test(p)) return false;
+  // Only the genuinely multi-word dialects belong here: "WEIGHT for REPS",
+  // "REPS reps x/@ WEIGHT", "N @ WEIGHT", trailing "@RPE", or "x AMRAP". A plain
+  // space-separated multi-token part ("100x5 102.5x5", "25 x12 x12") must NOT be
+  // captured — it is space-tokenized as several sets instead.
+  const richForms = [
+    /^\d+(?:\.\d+)?\s*(?:kgs?|kg|lbs?|lb)?\s+for\s+\d+/i, // weight for reps
+    /^\d+(?:\.\d+)?\s+reps?\s*[x×@]\s*\d+/i, // "8 reps x/@ 100"
+    /^\d+(?:\.\d+)?\s*@\s*\d+/i, // reps-first "8 @ 100"
+    /[x×]\s*(?:amrap|max|f)\b/i, // AMRAP / to-failure
+    /@\s*(?:rpe\s*)?\d/i, // trailing RPE
+  ];
+  if (!richForms.some((re) => re.test(p))) return false;
+  const parsed = parseToken(p);
+  return parsed !== null && parsed.reps !== 0;
 }
 
 /**
@@ -303,146 +436,6 @@ export function isFullySetTokens(segment: string, allowName: boolean): boolean {
 
   // Fully consumed, or only non-alphabetic noise left → all set tokens.
   return !/[a-z]/i.test(remaining);
-}
-
-/**
- * Tokenize a space-containing part (no commas) into individual set tokens.
- * Handles: "100x5 102.5x5 105x4", "25 x12 x12 x15", "70kg x 5", "105x 5".
- */
-function tokenizePart(part: string): string[] {
-  if (hasMultipleXRepTokens(part)) {
-    const tokens: string[] = [];
-    let remaining = part.trim();
-    const weightCarrier = remaining.match(
-      /^(\d+(?:\.\d+)?)\s*(?:kgs?|kg)(?=\s+[x×])|^(\d+(?:\.\d+)?)(?=\s+[x×])/i,
-    );
-    if (weightCarrier) {
-      tokens.push(weightCarrier[0].trim());
-      remaining = remaining.slice(weightCarrier[0].length).trim();
-    }
-    while (remaining.length > 0) {
-      const leadingX = remaining.match(/^[x×]\s*(\d+(?:\.\d+)?)/i);
-      if (!leadingX) break;
-      tokens.push(leadingX[0].trim());
-      remaining = remaining.slice(leadingX[0].length).trim();
-    }
-    return tokens;
-  }
-
-  const tokens: string[] = [];
-  let remaining = part.trim();
-
-  while (remaining.length > 0) {
-    // Try to match a WEIGHT [unit] x REPS token (with optional spaces around x).
-    // "105x 5", "70kg x 5", "100x5", "42.5 x6"
-    const weightXReps = remaining.match(
-      /^(\d+(?:\.\d+)?)\s*(?:kgs?|kg)?\s*[x×]\s*(\d+(?:\.\d+)?)/i,
-    );
-    if (weightXReps) {
-      tokens.push(weightXReps[0].trim());
-      remaining = remaining.slice(weightXReps[0].length).trim();
-      continue;
-    }
-
-    // Leading-x rep token: "x12", "x 12" — no weight, just reps.
-    const leadingX = remaining.match(/^[x×]\s*(\d+)/i);
-    if (leadingX) {
-      tokens.push(leadingX[0].trim());
-      remaining = remaining.slice(leadingX[0].length).trim();
-      continue;
-    }
-
-    // WEIGHT [unit] carrier, or bare weight before x-rep tokens ("25 x12").
-    const weightOnly = remaining.match(
-      /^(\d+(?:\.\d+)?)\s*(?:kgs?|kg)(?=\s)|^(\d+(?:\.\d+)?)(?=\s+[x×])/i,
-    );
-    if (weightOnly) {
-      tokens.push(weightOnly[0].trim());
-      remaining = remaining.slice(weightOnly[0].length).trim();
-      continue;
-    }
-
-    break;
-  }
-
-  return tokens.filter((t) => t.length > 0);
-}
-
-function hasMultipleXRepTokens(part: string): boolean {
-  if (/^\d+(?:\.\d+)?\s*(?:kgs?|kg)?\s*[x×]\d+[x×]\d+\b/i.test(part)) return false;
-  const stripped = part
-    .replace(/^(\d+(?:\.\d+)?)\s*(?:kgs?|kg)\s+/i, '')
-    .replace(/^(\d+(?:\.\d+)?)\s+/, '');
-  const xRepTokens = stripped.match(/(?:^|\s)[x×]\s*\d+(?:\.\d+)?/gi);
-  return xRepTokens !== null && xRepTokens.length >= 2;
-}
-
-interface TokenResult {
-  weightKg: number | null;
-  reps: number;
-  repsOnly: boolean;
-}
-
-/**
- * Parse one set token. Recognized shapes:
- *   105x5 | 105x 5 | 105 x 5 | 70kgx5 | 70kg x 5 | 30kgsx 5 | 42.5 x6 | 5 (reps only)
- *   x12 | x 12  (leading-x rep token, carries weight from caller)
- */
-function parseToken(token: string): TokenResult | null {
-  const t = token.trim().replace(/\.{2,}$|…$/g, '').trim();
-  if (!t) return null;
-
-  // Leading-x rep token: "x12", "x 12" — weight is null (reps-only, caller carries).
-  const leadingX = t.match(/^[x×]\s*(\d+(?:\.\d+)?)$/i);
-  if (leadingX) {
-    return {
-      weightKg: null,
-      reps: Math.round(Number.parseFloat(leadingX[1])),
-      repsOnly: true,
-    };
-  }
-
-  // WEIGHT [unit] x REPS  (x may be x or ×; unit kg/kgs optional; spaces flexible)
-  const withWeight = t.match(
-    /^(\d+(?:\.\d+)?)\s*(?:kgs?|kg)?\s*[x×]\s*(\d+(?:\.\d+)?)$/i,
-  );
-  if (withWeight) {
-    return {
-      weightKg: roundNum(Number.parseFloat(withWeight[1])),
-      reps: Math.round(Number.parseFloat(withWeight[2])),
-      repsOnly: false,
-    };
-  }
-
-  // WEIGHT unit, no rep marker (e.g. a standalone "60kg"): a weight CARRIER, not
-  // a set. Contract: reps=0 signals "no set here, just a weight to carry forward".
-  // scanTokens treats any reps===0 result as a carrier (sets carriedWeight, emits
-  // no set), so this never produces a 0-rep set in the output.
-  const weightOnly = t.match(/^(\d+(?:\.\d+)?)\s*(?:kgs?|kg)$/i);
-  if (weightOnly) {
-    return {
-      weightKg: roundNum(Number.parseFloat(weightOnly[1])),
-      reps: 0,
-      repsOnly: false,
-    };
-  }
-
-  // reps-only token: bare number (not "87 kgs" or "26 Aug").
-  const repsOnly = t.match(/^(\d+(?:\.\d+)?)(?!\s*(?:kgs?|kg)$)(?!\s+[a-z])/i);
-  if (repsOnly) {
-    return {
-      weightKg: null,
-      reps: Math.round(Number.parseFloat(repsOnly[1])),
-      repsOnly: true,
-    };
-  }
-
-  return null;
-}
-
-function roundNum(n: number): number {
-  // keep one decimal of precision where present, else integer
-  return Math.round(n * 100) / 100;
 }
 
 /**
