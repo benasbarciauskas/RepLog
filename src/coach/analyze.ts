@@ -1,57 +1,5 @@
-import type {
-  CoachFinding,
-  ExerciseBest,
-  FindingSeverity,
-  MuscleGroup,
-  Workout,
-} from '@/types/models';
+import type { CoachFinding, ExerciseBest, FindingSeverity, MuscleGroup } from '@/types/models';
 import { RATIO_RULES, type RatioRule } from './ratios';
-
-/** Every MuscleGroup, so coverage always reports a full body map. */
-const ALL_MUSCLES: MuscleGroup[] = [
-  'chest',
-  'front-delts',
-  'side-delts',
-  'rear-delts',
-  'lats',
-  'traps',
-  'upper-back',
-  'biceps',
-  'triceps',
-  'forearms',
-  'quads',
-  'hamstrings',
-  'glutes',
-  'calves',
-  'abs',
-  'lower-back',
-];
-
-/**
- * Working sets below this count (across the whole dataset) read as undertrained.
- * 0 sets reads as `never`.
- */
-const UNDERTRAINED_THRESHOLD = 6;
-
-/**
- * v1 internal exercise -> worked-muscles map for the canonical catalog ids the
- * coach engine knows about. Each set of a listed exercise contributes one
- * working set to every muscle it lists. Uncatalogued / `unknown:` exercises are
- * absent here and therefore contribute nothing to coverage (never fabricate).
- *
- * When the full catalog (Task P) lands, this can be swapped for the catalog's
- * primary+secondary muscle definitions without changing the public contract.
- */
-const EXERCISE_MUSCLES: Record<string, MuscleGroup[]> = {
-  'barbell-bench-press': ['chest', 'front-delts', 'triceps'],
-  'incline-bench': ['chest', 'front-delts', 'triceps'],
-  'overhead-press': ['front-delts', 'side-delts', 'triceps'],
-  'barbell-row': ['upper-back', 'lats', 'biceps', 'rear-delts'],
-  'weighted-pull-up': ['lats', 'biceps', 'upper-back', 'forearms'],
-  'back-squat': ['quads', 'glutes', 'lower-back', 'abs'],
-  'front-squat': ['quads', 'glutes', 'upper-back', 'abs'],
-  deadlift: ['hamstrings', 'glutes', 'lower-back', 'quads', 'traps', 'forearms'],
-};
 
 /** Round to 2dp for stable message strings. */
 function fmtRatio(ratio: number): string {
@@ -185,37 +133,4 @@ export function analyzeImbalances(bests: ExerciseBest[]): CoachFinding[] {
 
   findings.sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]);
   return findings;
-}
-
-/**
- * Count working sets per muscle across all workouts, then classify coverage.
- * Warmup sets are excluded. Exercises not in the internal muscle map contribute
- * nothing (uncatalogued ids can't be attributed to a muscle in v1).
- */
-export function muscleCoverage(
-  workouts: Workout[],
-): { muscle: MuscleGroup; sets: number; status: 'ok' | 'undertrained' | 'never' }[] {
-  const setsByMuscle = new Map<MuscleGroup, number>();
-  for (const m of ALL_MUSCLES) setsByMuscle.set(m, 0);
-
-  for (const w of workouts) {
-    for (const exercise of w.exercises) {
-      const muscles = EXERCISE_MUSCLES[exercise.exerciseId];
-      if (!muscles) continue; // uncatalogued -> contributes nothing
-      const workingSets = exercise.sets.filter((s) => !s.isWarmup).length;
-      if (workingSets === 0) continue;
-      for (const m of muscles) {
-        setsByMuscle.set(m, (setsByMuscle.get(m) ?? 0) + workingSets);
-      }
-    }
-  }
-
-  return ALL_MUSCLES.map((muscle) => {
-    const sets = setsByMuscle.get(muscle) ?? 0;
-    let status: 'ok' | 'undertrained' | 'never';
-    if (sets === 0) status = 'never';
-    else if (sets < UNDERTRAINED_THRESHOLD) status = 'undertrained';
-    else status = 'ok';
-    return { muscle, sets, status };
-  });
 }

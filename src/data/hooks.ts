@@ -5,6 +5,8 @@ import { computeBests } from '@/analytics/bests';
 import { inferBlocks } from '@/analytics/blocks';
 import { bodyweightSeries } from '@/analytics/bodyweight';
 import { analyzeImbalances } from '@/coach/analyze';
+import { buildMuscleLookup, weeklyMuscleVolume, type VolumeReport } from '@/coach/volume';
+import { createCatalog } from '@/parser/catalog';
 import type {
   ActiveSession,
   AppSettings,
@@ -47,6 +49,26 @@ export function useCoachFindings(): CoachFinding[] {
     async () => analyzeImbalances(computeBests(await db.workouts.toArray())),
     [],
     [],
+  );
+}
+
+/**
+ * Weekly working-sets-per-muscle over a trailing `weeks`-week window, live from
+ * the data. Builds the muscle lookup from the full catalog (built-ins + the
+ * user's custom exercises) so custom lifts contribute volume too.
+ */
+export function useWeeklyVolume(weeks = 4): VolumeReport {
+  return useLiveQuery(
+    async () => {
+      const [workouts, custom] = await Promise.all([
+        db.workouts.toArray(),
+        db.customExercises.toArray(),
+      ]);
+      const lookup = buildMuscleLookup(createCatalog(custom).all());
+      return weeklyMuscleVolume(workouts, lookup, { weeks });
+    },
+    [weeks],
+    { weeks, anchorDate: null, muscles: [] },
   );
 }
 

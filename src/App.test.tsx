@@ -14,6 +14,7 @@ vi.mock('@/data/hooks', () => ({
   useBlocks: () => [],
   useBodyweightSeries: () => [],
   useCoachFindings: () => [],
+  useWeeklyVolume: () => ({ weeks: 4, anchorDate: null, muscles: [] }),
   // Logger (/log) + Routines (/routines) read these; Exercise + History read
   // settings (display unit). Empties/defaults are enough for the shell-mount test.
   useActiveSession: () => undefined,

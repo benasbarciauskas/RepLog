@@ -2,17 +2,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { CoachFinding, ExerciseBest, Workout } from '@/types/models';
+import type { MuscleVolume, VolumeReport } from '@/coach/volume';
 
 const workoutsMock = vi.fn<() => Workout[]>(() => []);
 const findingsMock = vi.fn<() => CoachFinding[]>(() => []);
 const bestsMock = vi.fn<() => ExerciseBest[]>(() => []);
+const volumeMock = vi.fn<() => VolumeReport>(() => ({
+  weeks: 4,
+  anchorDate: null,
+  muscles: [],
+}));
 
-// muscleCoverage + balanceScore are intentionally NOT mocked — the page calls
-// the real engines.
+// balanceScore is intentionally NOT mocked — the page calls the real engine.
 vi.mock('@/data/hooks', () => ({
   useWorkouts: () => workoutsMock(),
   useCoachFindings: () => findingsMock(),
   useBests: () => bestsMock(),
+  useWeeklyVolume: () => volumeMock(),
 }));
 
 async function renderCoach() {
@@ -74,10 +80,20 @@ const benchWorkout: Workout = {
   ],
 };
 
+/** Build a MuscleVolume entry for test fixtures. */
+function muscleVol(
+  muscle: MuscleVolume['muscle'],
+  setsPerWeek: number,
+  status: MuscleVolume['status'],
+): MuscleVolume {
+  return { muscle, setsPerWeek, totalSets: setsPerWeek * 4, status };
+}
+
 beforeEach(() => {
   workoutsMock.mockReturnValue([]);
   findingsMock.mockReturnValue([]);
   bestsMock.mockReturnValue([]);
+  volumeMock.mockReturnValue({ weeks: 4, anchorDate: null, muscles: [] });
 });
 
 afterEach(() => {
@@ -133,17 +149,29 @@ describe('CoachPage', { timeout: 20000 }, () => {
     ).toBeInTheDocument();
   });
 
-  it('renders a muscle-coverage view (never-trained groups) from real coverage', async () => {
-    // Only bench is logged → legs/back muscles are "never".
+  it('renders a weekly volume section with undertrained chips', async () => {
     workoutsMock.mockReturnValue([benchWorkout]);
     bestsMock.mockReturnValue(scorableBests);
     findingsMock.mockReturnValue([]);
+    volumeMock.mockReturnValue({
+      weeks: 4,
+      anchorDate: '2023-07-10',
+      muscles: [
+        muscleVol('hamstrings', 0, 'never'),
+        muscleVol('quads', 2.5, 'under'),
+        muscleVol('chest', 10, 'optimal'),
+      ],
+    });
 
     await renderCoach();
 
-    expect(screen.getByRole('heading', { name: /muscle coverage/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /never trained/i })).toBeInTheDocument();
-    // Quads were never worked (only bench logged).
-    expect(screen.getByText('Quads')).toBeInTheDocument();
+    // Weekly volume heading is present.
+    expect(screen.getByRole('heading', { name: /weekly volume/i })).toBeInTheDocument();
+
+    // An undertrained chip for quads (setsPerWeek 2.5 → '2.5/wk').
+    expect(screen.getByText(/Quads · 2\.5\/wk/)).toBeInTheDocument();
+
+    // A never chip for hamstrings (setsPerWeek 0 → '0/wk').
+    expect(screen.getByText(/Hamstrings · 0\/wk/)).toBeInTheDocument();
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { analyzeImbalances, muscleCoverage } from '../analyze';
-import type { ExerciseBest, Workout, WorkoutExercise } from '@/types/models';
+import { analyzeImbalances } from '../analyze';
+import type { ExerciseBest } from '@/types/models';
 
 /** Build a minimal ExerciseBest with only the fields the coach engine reads. */
 function best(exerciseId: string, bestE1rmKg: number | null): ExerciseBest {
@@ -11,34 +11,6 @@ function best(exerciseId: string, bestE1rmKg: number | null): ExerciseBest {
     bestE1rmKg,
     bestE1rmDate: bestE1rmKg == null ? null : '2026-06-01',
     repPRs: [],
-  };
-}
-
-function workout(exercises: WorkoutExercise[]): Workout {
-  return {
-    id: 'w1',
-    date: '2026-06-01',
-    dateConfidence: 'high',
-    bodyweightKg: 80,
-    splitCanonical: 'push',
-    splitRaw: null,
-    blockId: null,
-    sourceNoteId: 'n1',
-    exercises,
-    createdAt: '2026-06-01T00:00:00.000Z',
-  };
-}
-
-function ex(exerciseId: string, nWorkingSets: number): WorkoutExercise {
-  return {
-    exerciseId,
-    rawName: exerciseId,
-    unit: 'kg',
-    sets: Array.from({ length: nWorkingSets }, (_, i) => ({
-      weightKg: 100,
-      reps: 5,
-      raw: `100x5#${i}`,
-    })),
   };
 }
 
@@ -108,46 +80,5 @@ describe('analyzeImbalances', () => {
     for (let i = 1; i < findings.length; i++) {
       expect(order[findings[i].severity]).toBeGreaterThanOrEqual(order[findings[i - 1].severity]);
     }
-  });
-});
-
-describe('muscleCoverage', () => {
-  it('counts working sets per muscle and classifies coverage', () => {
-    const workouts = [
-      workout([
-        ex('barbell-bench-press', 8), // chest (+ front-delts, triceps secondary)
-        ex('overhead-press', 2), // front-delts/triceps
-      ]),
-    ];
-    const coverage = muscleCoverage(workouts);
-    const byMuscle = Object.fromEntries(coverage.map((c) => [c.muscle, c]));
-
-    // chest gets 8 sets -> ok
-    expect(byMuscle['chest'].sets).toBeGreaterThanOrEqual(8);
-    expect(byMuscle['chest'].status).toBe('ok');
-
-    // a muscle nobody trained -> never (0 sets)
-    expect(byMuscle['calves'].sets).toBe(0);
-    expect(byMuscle['calves'].status).toBe('never');
-
-    // every MuscleGroup is represented in the output
-    expect(coverage.length).toBe(16);
-  });
-
-  it('marks a lightly-trained muscle as undertrained', () => {
-    // a single exercise with only a few sets touching hamstrings
-    const workouts = [workout([ex('deadlift', 3)])]; // deadlift -> hamstrings/glutes/lower-back
-    const coverage = muscleCoverage(workouts);
-    const ham = coverage.find((c) => c.muscle === 'hamstrings')!;
-    expect(ham.sets).toBeGreaterThan(0);
-    expect(ham.sets).toBeLessThan(6);
-    expect(ham.status).toBe('undertrained');
-  });
-
-  it('contributes nothing for uncatalogued exercises', () => {
-    const workouts = [workout([ex('unknown:mystery-machine', 10)])];
-    const coverage = muscleCoverage(workouts);
-    expect(coverage.every((c) => c.sets === 0)).toBe(true);
-    expect(coverage.every((c) => c.status === 'never')).toBe(true);
   });
 });

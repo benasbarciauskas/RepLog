@@ -8,14 +8,14 @@ import {
   Info,
   Lock,
   Target,
+  TrendingUp,
 } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { Button } from '@/components/ui/button';
 import { RingGauge, type GaugeTone } from '@/components/charts/RingGauge';
 import { cn } from '@/lib/utils';
-import { useBests, useCoachFindings, useWorkouts } from '@/data/hooks';
-import { muscleCoverage } from '@/coach/analyze';
+import { useBests, useCoachFindings, useWeeklyVolume, useWorkouts } from '@/data/hooks';
 import {
   balanceScore,
   overallLabel,
@@ -23,11 +23,18 @@ import {
   type ScoreStatus,
 } from '@/coach/score';
 import type { CoachFinding, FindingSeverity, MuscleGroup } from '@/types/models';
+import type { MuscleVolume } from '@/coach/volume';
 
 const EASE_OUT: [number, number, number, number] = [0.23, 1, 0.32, 1];
 
 function humanMuscle(m: MuscleGroup): string {
   return m.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/** Format setsPerWeek to 1dp, dropping a trailing '.0'. */
+function fmtSets(n: number): string {
+  const s = n.toFixed(1);
+  return s.endsWith('.0') ? s.slice(0, -2) : s;
 }
 
 /** Score band → ring tone. Acid-lime only for strong; warn/destructive escalate. */
@@ -80,17 +87,23 @@ export default function CoachPage() {
   const findings = useCoachFindings();
   const bests = useBests();
   const workouts = useWorkouts();
+  const volume = useWeeklyVolume();
   const reduce = useReducedMotion();
 
   const score = useMemo(() => balanceScore(bests), [bests]);
-  const coverage = useMemo(() => muscleCoverage(workouts), [workouts]);
 
   // Recommendation cards = actionable findings, impact-ordered (priority first;
   // analyzeImbalances already sorts priority → flag → ok).
   const recommendations = findings.filter((f) => f.severity !== 'ok');
 
-  const undertrained = coverage.filter((c) => c.status === 'undertrained');
-  const never = coverage.filter((c) => c.status === 'never');
+  // Weekly volume groupings.
+  const volUndertrained = volume.muscles.filter(
+    (m) => m.status === 'under' || m.status === 'never',
+  );
+  const volOptimal = volume.muscles.filter((m) => m.status === 'optimal');
+  const volHigh = volume.muscles.filter((m) => m.status === 'high');
+  const allZero =
+    volume.muscles.length > 0 && volume.muscles.every((m) => m.setsPerWeek === 0);
 
   // No data → encouraging first-run prompt.
   if (workouts.length === 0) {
@@ -259,32 +272,64 @@ export default function CoachPage() {
           </section>
         ) : null}
 
-        {/* Muscle coverage (secondary) */}
-        {never.length > 0 || undertrained.length > 0 ? (
-          <section aria-labelledby="coverage-heading">
-            <SectionTitle id="coverage-heading" icon={AlertTriangle}>
-              Muscle coverage
-            </SectionTitle>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {never.length > 0 ? (
-                <CoverageCard
-                  tone="never"
-                  title="Never trained"
-                  description="No working sets logged for these in any catalogued exercise."
-                  muscles={never.map((c) => humanMuscle(c.muscle))}
+        {/* Weekly volume (replaces old all-time Muscle coverage) */}
+        <section aria-labelledby="volume-heading">
+          <SectionTitle id="volume-heading" icon={TrendingUp}>
+            Weekly volume
+          </SectionTitle>
+          <p className="mb-4 text-sm text-muted-foreground">
+            Average working sets per muscle over the last 4 weeks. Compound lifts credit
+            primary muscles fully and secondary muscles at half.
+          </p>
+
+          {allZero ? (
+            <p className="text-sm text-muted-foreground">
+              No working sets in the last 4 weeks — log a session to see your volume balance.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {/* Undertrained: under + never */}
+              {volUndertrained.length > 0 ? (
+                <VolumeCard
+                  tone="warn"
+                  title="Undertrained"
+                  description="Below the minimum effective volume of 8 sets/wk."
+                  muscles={volUndertrained}
                 />
               ) : null}
-              {undertrained.length > 0 ? (
-                <CoverageCard
-                  tone="undertrained"
-                  title="Undertrained"
-                  description="Some volume, but fewer than 6 working sets across your history."
-                  muscles={undertrained.map((c) => `${humanMuscle(c.muscle)} · ${c.sets}`)}
+
+              {/* Optimal */}
+              {volOptimal.length > 0 ? (
+                <VolumeCard
+                  tone="optimal"
+                  title="In the sweet spot (8–20 sets/wk)"
+                  description=""
+                  muscles={volOptimal}
                 />
+              ) : null}
+
+              {/* High volume — only when any exist */}
+              {volHigh.length > 0 ? (
+                <div className="rounded-xl border border-warn/30 bg-card p-5 shadow-sm">
+                  <h3 className="flex items-center gap-2 text-sm font-semibold text-warn">
+                    <Info className="size-4" strokeWidth={1.75} aria-hidden />
+                    Above ~20 sets/wk — watch recovery.
+                  </h3>
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {volHigh.map((m) => (
+                      <span
+                        key={m.muscle}
+                        className="tnum rounded-md bg-surface px-2 py-1 text-xs text-foreground"
+                      >
+                        {humanMuscle(m.muscle)} · {fmtSets(m.setsPerWeek)}/wk
+                      </span>
+                    ))}
+                  </div>
+                </div>
               ) : null}
             </div>
-          </section>
-        ) : null}
+          )}
+        </section>
       </div>
     </div>
   );
@@ -418,37 +463,40 @@ function UnlockList({ items }: { items: { ruleId: string; label: string }[] }) {
   );
 }
 
-function CoverageCard({
+function VolumeCard({
   tone,
   title,
   description,
   muscles,
 }: {
-  tone: 'never' | 'undertrained';
+  tone: 'warn' | 'optimal';
   title: string;
   description: string;
-  muscles: string[];
+  muscles: MuscleVolume[];
 }) {
   return (
     <div
       className={cn(
         'rounded-xl border bg-card p-5 shadow-sm',
-        tone === 'never' ? 'border-destructive/30' : 'border-warn/30',
+        tone === 'warn' ? 'border-destructive/30' : 'border-highlight/30',
       )}
     >
       <h3
         className={cn(
           'text-sm font-semibold',
-          tone === 'never' ? 'text-destructive' : 'text-warn',
+          tone === 'warn' ? 'text-destructive' : 'text-highlight',
         )}
       >
         {title}
       </h3>
-      <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+      {description ? <p className="mt-1 text-xs text-muted-foreground">{description}</p> : null}
       <div className="mt-3 flex flex-wrap gap-1.5">
         {muscles.map((m) => (
-          <span key={m} className="tnum rounded-md bg-surface px-2 py-1 text-xs text-foreground">
-            {m}
+          <span
+            key={m.muscle}
+            className="tnum rounded-md bg-surface px-2 py-1 text-xs text-foreground"
+          >
+            {humanMuscle(m.muscle)} · {fmtSets(m.setsPerWeek)}/wk
           </span>
         ))}
       </div>
