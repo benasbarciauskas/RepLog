@@ -118,6 +118,32 @@ describe('parseExerciseLine', () => {
     ]);
   });
 
+  it('parses a two-value bodyweight slash rep-list (no data loss when both <=12)', () => {
+    const ex = parseExerciseLine('pullups 12/10', cat)[0];
+    expect(ex.exerciseId).toBe('pull-up');
+    expect(ex.sets).toEqual([
+      { weightKg: null, reps: 12, raw: '12' },
+      { weightKg: null, reps: 10, raw: '10' },
+    ]);
+  });
+
+  it('parses a two-value bodyweight slash rep-list with both values <=12 (10/8)', () => {
+    const ex = parseExerciseLine('pullups 10/8', cat)[0];
+    expect(ex.exerciseId).toBe('pull-up');
+    expect(ex.sets).toEqual([
+      { weightKg: null, reps: 10, raw: '10' },
+      { weightKg: null, reps: 8, raw: '8' },
+    ]);
+  });
+
+  it('still parses a weighted two-value slash list after a leading weight (dips 20/15)', () => {
+    const ex = parseExerciseLine('dips 20/15', cat)[0];
+    expect(ex.sets).toEqual([
+      { weightKg: null, reps: 20, raw: '20' },
+      { weightKg: null, reps: 15, raw: '15' },
+    ]);
+  });
+
   it('parses WEIGHT xNxM scheme shorthand as N sets of M reps', () => {
     const ex = parseExerciseLine('squat 140 x5x5', cat)[0];
     expect(ex.sets).toHaveLength(5);

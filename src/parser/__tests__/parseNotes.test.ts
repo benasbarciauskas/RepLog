@@ -115,4 +115,10 @@ describe('parseNotes — messy dialect smoke note', () => {
     const pullups = legs.exercises.find((e) => e.exerciseId === 'pull-up')!;
     expect(pullups.sets.map((s) => s.reps)).toEqual([12, 10, 8]);
   });
+
+  it('produces NO false inline-remainder warnings for the messy dialects (regression)', () => {
+    // Every line here parses cleanly; the widened space/scheme/slash set formats
+    // must not be mis-flagged as unparsed inline entries.
+    expect(result.warnings).toEqual([]);
+  });
 });

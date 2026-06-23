@@ -128,10 +128,14 @@ function parseSets(setText: string): SetEntry[] {
     }));
   }
 
-  // 3. Bare slash rep-list with NO leading weight: "12/10/8".
+  // 3. Bare slash rep-list with NO leading weight: "12/10/8" or "12/10".
   //    Only matches when the very first token is digits/digits (no letters before).
+  //    NO date guard here: parseSets only ever receives set-text from a line that
+  //    already has an exercise name, so a bare "12/10" here is a 2-set rep-list,
+  //    never a DD/MM date. Date headers carry no name and are matched at
+  //    line-start in segment.ts / fields.ts before they reach this tokenizer.
   const bareSlashMatch = text.match(/^(\d+(?:\/\d+)+)(?:\s|$)/);
-  if (bareSlashMatch && !looksLikeNumericDate(bareSlashMatch[1])) {
+  if (bareSlashMatch) {
     const repParts = bareSlashMatch[1].split('/');
     return repParts.map((r) => ({
       weightKg: null,
@@ -209,6 +213,96 @@ function scanTokens(text: string): SetEntry[] {
   }
 
   return sets;
+}
+
+/**
+ * Does this comma-segment consist ENTIRELY of recognized set tokens (plus an
+ * optional leading exercise name on the first segment), with no leftover
+ * alphabetic remainder?
+ *
+ * Used by parseNotes.collectInlineRemainders to decide whether a comma-segment
+ * is fully accounted for by the set tokenizer (so it must NOT be flagged) or
+ * carries an un-captured inline secondary exercise like "then archers x 10"
+ * (which MUST be flagged). Reuses the SAME token recognizers as parseSets /
+ * tokenizePart so there is a single grammar, never a second narrower one.
+ *
+ * @param segment   one comma-segment of set-text
+ * @param allowName when true, a leading exercise-name prefix (letters before the
+ *                  first digit, as splitNameAndSets would strip) is allowed and
+ *                  ignored — used for the first segment of a no-colon line.
+ */
+export function isFullySetTokens(segment: string, allowName: boolean): boolean {
+  let text = segment.replace(/\.{2,}|…/g, '').trim();
+  if (!text) return true; // empty segment = nothing to flag
+
+  // A pure bare-rep segment ("12", "12.5") is set data.
+  if (/^\d+(?:\.\d+)?$/.test(text)) return true;
+
+  // Optionally strip a leading exercise name (letters before the first digit),
+  // mirroring splitNameAndSets for a no-colon line's first segment.
+  if (allowName) {
+    const firstDigit = text.search(/\d/);
+    if (firstDigit > 0) {
+      const namePart = text.slice(0, firstDigit);
+      // Only treat it as a name if it is purely name-like (letters/spaces/.-'/),
+      // not e.g. an "x12" leading-x token.
+      if (/^[a-z][a-z\s.'/-]*$/i.test(namePart)) {
+        text = text.slice(firstDigit).trim();
+      }
+    } else if (firstDigit === -1) {
+      // No digits at all — pure alpha (e.g. "then archers"): an unparsed remainder.
+      return false;
+    }
+  }
+
+  // Whole-segment forms parseSets matches at the start (scheme / slash lists).
+  if (
+    /^(\d+(?:\.\d+)?)\s*(?:kgs?|kg)?\s*[x×]\d+[x×]\d+(?:\s|$)/i.test(text) ||
+    /^(\d+(?:\.\d+)?)\s*(?:kgs?|kg)?\s+\d+(?:\/\d+)+(?:\s|$)/i.test(text) ||
+    /^\d+(?:\/\d+)+(?:\s|$)/.test(text)
+  ) {
+    // These consume the whole token; treat remainder (if any) by re-checking below
+    // is overkill — the regexes above anchor on the leading run, and a trailing
+    // remainder after a slash/scheme list is not a real-world dialect. Accept.
+    return true;
+  }
+
+  // Otherwise, repeatedly consume known per-token forms (the same ones the
+  // tokenizer's tokenizePart / parseToken understand). If we consume the whole
+  // string, it's all set tokens; if an alphabetic remainder is left, flag it.
+  let remaining = text;
+  // optional leading weight carrier ("25 x12", "100kg x8")
+  const carrier = remaining.match(
+    /^(\d+(?:\.\d+)?)\s*(?:kgs?|kg)(?=\s)|^(\d+(?:\.\d+)?)(?=\s+[x×])/i,
+  );
+  if (carrier) remaining = remaining.slice(carrier[0].length).trim();
+
+  while (remaining.length > 0) {
+    // WEIGHT [unit] x REPS  ("105x5", "70kg x 5", "42.5 x6", "105x 5")
+    const weightXReps = remaining.match(
+      /^(\d+(?:\.\d+)?)\s*(?:kgs?|kg)?\s*[x×]\s*(\d+(?:\.\d+)?)/i,
+    );
+    if (weightXReps) {
+      remaining = remaining.slice(weightXReps[0].length).trim();
+      continue;
+    }
+    // leading-x rep token ("x12", "x 12")
+    const leadingX = remaining.match(/^[x×]\s*(\d+(?:\.\d+)?)/i);
+    if (leadingX) {
+      remaining = remaining.slice(leadingX[0].length).trim();
+      continue;
+    }
+    // bare weight-only / bare reps ("60kg", "12")
+    const bare = remaining.match(/^(\d+(?:\.\d+)?)\s*(?:kgs?|kg)?(?=\s|$)/i);
+    if (bare && bare[0].length > 0) {
+      remaining = remaining.slice(bare[0].length).trim();
+      continue;
+    }
+    break;
+  }
+
+  // Fully consumed, or only non-alphabetic noise left → all set tokens.
+  return !/[a-z]/i.test(remaining);
 }
 
 /**
@@ -320,14 +414,12 @@ function parseToken(token: string): TokenResult | null {
     };
   }
 
-  // WEIGHT unit  (no rep marker, e.g. "60kg" standalone) -> treat as weight carrier (repsOnly=false, reps=0)
-  // But we don't want to emit a 0-rep set; this is consumed by the tokenizer as a weight carrier.
-  // For now, skip bare weight-only tokens (they'd produce reps=0).
+  // WEIGHT unit, no rep marker (e.g. a standalone "60kg"): a weight CARRIER, not
+  // a set. Contract: reps=0 signals "no set here, just a weight to carry forward".
+  // scanTokens treats any reps===0 result as a carrier (sets carriedWeight, emits
+  // no set), so this never produces a 0-rep set in the output.
   const weightOnly = t.match(/^(\d+(?:\.\d+)?)\s*(?:kgs?|kg)$/i);
   if (weightOnly) {
-    // Return as a weight-carrying entry with reps=0 — caller will filter or treat as carrier.
-    // Actually: these get emitted as 0-rep sets which we don't want. Instead, carry weight.
-    // We'll emit it as a "weight set" with reps=0 and filter it out below.
     return {
       weightKg: roundNum(Number.parseFloat(weightOnly[1])),
       reps: 0,
@@ -346,14 +438,6 @@ function parseToken(token: string): TokenResult | null {
   }
 
   return null;
-}
-
-/** Two-part slash lists that look like DD/MM dates are not rep lists. */
-function looksLikeNumericDate(slashText: string): boolean {
-  const parts = slashText.split('/').map((p) => Number.parseInt(p, 10));
-  if (parts.length !== 2) return false;
-  const [day, month] = parts;
-  return day >= 1 && day <= 31 && month >= 1 && month <= 12;
 }
 
 function roundNum(n: number): number {

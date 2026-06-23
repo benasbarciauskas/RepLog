@@ -1,6 +1,6 @@
 import type { ParseResult, ParsedWorkout, WorkoutExercise } from '@/types/models';
 import type { ExerciseCatalog } from './catalog';
-import { parseExerciseLine } from './exerciseLine';
+import { isFullySetTokens, parseExerciseLine } from './exerciseLine';
 import { detectSplit, extractBodyweight, extractDate } from './fields';
 import { isSessionHeader, segmentWorkouts } from './segment';
 import { preprocessStructured } from './structured';
@@ -116,28 +116,39 @@ function looksLikeSetLine(line: string): boolean {
 }
 
 /**
- * After an exercise line parses, scan its comma tokens for an inline secondary
- * exercise that was NOT captured (e.g. "..., then archers x 10"). Such tokens
- * contain alphabetic content (an exercise name) and must be flagged, never
- * silently dropped.
+ * After an exercise line parses, scan its comma-segments for an inline secondary
+ * exercise that was NOT captured (e.g. "..., then archers x 10"). Such segments
+ * contain alphabetic content (an exercise name) beyond the set tokens and must be
+ * flagged, never silently dropped.
+ *
+ * To avoid false positives on the widened dialects (space-separated `NxM`,
+ * `WEIGHT NxM` schemes, slash rep-lists, leading-`x`, bare reps), each segment is
+ * checked with isFullySetTokens — the SAME token recognizers the set tokenizer
+ * uses — rather than a second, narrower regex. A segment fully accounted for by
+ * set tokens is not flagged; only a genuine alphabetic remainder is.
+ *
+ * On a no-colon line the first segment carries the exercise name (e.g.
+ * "bench press 100x5 102.5x5 105x4"), so the name prefix is allowed there.
  */
 function collectInlineRemainders(line: string, warnings: string[]): void {
   const colon = line.indexOf(':');
   const setText = colon !== -1 ? line.slice(colon + 1) : line;
+  const hasColon = colon !== -1;
 
-  for (const rawToken of setText.split(',')) {
+  const segments = setText.split(',');
+  segments.forEach((rawToken, i) => {
     const token = rawToken.trim();
-    if (!token) continue;
-
-    // A pure set token: digits, optional kg/kgs, optional x, optional reps.
-    const isSetToken = /^\d+(?:\.\d+)?\s*(?:kgs?|kg)?\s*(?:[x×]\s*\d+(?:\.\d+)?)?\s*\.{0,3}…?$/i.test(
-      token,
-    );
-    if (isSetToken) continue;
+    if (!token) return;
 
     // Skip pure noise (no letters at all, e.g. "..." or stray punctuation).
-    if (!/[a-z]/i.test(token)) continue;
+    if (!/[a-z]/i.test(token)) return;
+
+    // The first segment of a no-colon line carries the exercise name; allow it.
+    const allowName = !hasColon && i === 0;
+
+    // Fully accounted for by recognized set tokens → not an unparsed remainder.
+    if (isFullySetTokens(token, allowName)) return;
 
     warnings.push(`Unparsed inline entry "${token}" — review and add manually if it's an exercise.`);
-  }
+  });
 }
