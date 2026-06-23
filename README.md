@@ -81,11 +81,9 @@ It is 100% client-side: a React + TypeScript app that runs in your browser, stor
 | :------------------------------------------------------: | :----------------------------------------------------: |
 | <img src=".github/assets/logger.png" alt="Live set-by-set workout logger" width="420"> | <img src=".github/assets/import.png" alt="Importing and reviewing parsed workout notes" width="420"> |
 
-<details>
-  <summary>More screenshots</summary>
-  <br />
-  <img src=".github/assets/exercise.png" alt="Per-exercise progression graph" width="640">
-</details>
+|                          Settings                          |                  Per-exercise progress                   |
+| :--------------------------------------------------------: | :------------------------------------------------------: |
+| <img src=".github/assets/settings.png" alt="Settings — units, rest, plates, release channel, and backup & restore" width="420"> | <img src=".github/assets/exercise.png" alt="Per-exercise progression graph" width="420"> |
 
 </div>
 
