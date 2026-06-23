@@ -38,6 +38,7 @@ vi.mock('@/data/hooks', () => ({
   useSettings: () => settingsMock(),
 }));
 vi.mock('@/ai/openrouter', () => ({
+  VISION_IMAGE_CAP: 8,
   aiParseWorkouts: vi.fn(),
   aiParseWorkoutsFromImages: aiParseWorkoutsFromImagesMock,
 }));

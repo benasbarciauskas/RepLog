@@ -202,7 +202,7 @@ export async function aiParseWorkouts(
   );
 }
 
-const VISION_IMAGE_CAP = 8; // OpenRouter vision models cap at 8 images per request
+export const VISION_IMAGE_CAP = 8; // OpenRouter vision models cap at 8 images per request
 
 export async function aiParseWorkoutsFromImages(
   images: string[],

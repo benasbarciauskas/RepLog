@@ -251,4 +251,48 @@ describe('aiParseWorkoutsFromImages', () => {
 
     expect(result).toEqual([]);
   });
+
+  it('rejects with the at-least-one-image error when given no images', async () => {
+    const fetchMock = mockFetchResponse(200, {
+      choices: [{ message: { content: sampleAiContent } }],
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const catalog = createCatalog();
+    await expect(
+      aiParseWorkoutsFromImages([], { apiKey: SECRET_KEY, model: VISION_MODEL }, catalog),
+    ).rejects.toThrow('At least one image is required.');
+
+    // Guard rejects before any network call is made.
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('caps the request at 8 images, dropping the 9th and beyond', async () => {
+    const fetchMock = mockFetchResponse(200, {
+      choices: [{ message: { content: sampleAiContent } }],
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const nineImages = Array.from(
+      { length: 9 },
+      (_, i) => `data:image/jpeg;base64,img${i}`,
+    );
+
+    const catalog = createCatalog();
+    await aiParseWorkoutsFromImages(
+      nineImages,
+      { apiKey: SECRET_KEY, model: VISION_MODEL },
+      catalog,
+    );
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as {
+      messages: { role: string; content: { type: string }[] }[];
+    };
+
+    // 1 text part + 8 image_url parts (VISION_IMAGE_CAP = 8) — the 9th image is dropped.
+    expect(body.messages[1].content).toHaveLength(9);
+    const imageParts = body.messages[1].content.filter((p) => p.type === 'image_url');
+    expect(imageParts).toHaveLength(8);
+  });
 });

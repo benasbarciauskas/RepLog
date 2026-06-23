@@ -26,7 +26,7 @@ import { imageToText } from '@/ocr/ocr';
 import { stitchOcrText } from '@/ocr/stitch';
 import { VideoDecodeError, videoToFrames } from '@/ocr/video';
 import { useSettings, useWorkouts } from '@/data/hooks';
-import { aiParseWorkouts, aiParseWorkoutsFromImages } from '@/ai/openrouter';
+import { VISION_IMAGE_CAP, aiParseWorkouts, aiParseWorkoutsFromImages } from '@/ai/openrouter';
 import { createCatalog } from '@/parser';
 import { TrySampleDataButton } from '@/features/data/DataActions';
 import { ingestCorpus } from './pipeline';
@@ -182,11 +182,17 @@ export default function ImportPage() {
       toast.error('Add your OpenRouter key in Settings to use AI parse.');
       return;
     }
-    if (images.length === 0) return;
+    if (images.length === 0 || busy) return;
 
     setBusy(true);
     setProgress({ value: null, label: 'AI reading screenshots…' });
     try {
+      if (images.length > VISION_IMAGE_CAP) {
+        toast.info('Lots of screenshots', {
+          description: `We sent the first ${VISION_IMAGE_CAP} images to the AI. Read the rest in a second batch for full coverage.`,
+        });
+      }
+
       const dataUrls = await Promise.all(images.map(readFileAsDataUrl));
       const custom = await repository.getCustomExercises();
       const catalog = createCatalog(custom);
@@ -228,7 +234,7 @@ export default function ImportPage() {
       setBusy(false);
       setProgress(IDLE);
     }
-  }, [navigate, settings?.aiApiKey, settings?.aiVisionModel, images]);
+  }, [navigate, settings?.aiApiKey, settings?.aiVisionModel, images, busy]);
 
   // --- Screenshots → OCR each → corpus -------------------------------------
   const parseScreenshots = useCallback(async () => {
