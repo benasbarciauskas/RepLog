@@ -3,6 +3,7 @@ import type {
   ActiveSession,
   AppSettings,
   ExerciseDef,
+  Program,
   RawNote,
   Routine,
   Workout,
@@ -27,6 +28,7 @@ export class RepLogDB extends Dexie {
   activeSession!: EntityTable<ActiveSession & { id: string }, 'id'>;
   routines!: EntityTable<Routine, 'id'>;
   settings!: EntityTable<AppSettings & { id: string }, 'id'>;
+  programs!: EntityTable<Program, 'id'>;
 
   constructor() {
     super('replog');
@@ -44,6 +46,16 @@ export class RepLogDB extends Dexie {
       activeSession: 'id',
       routines: 'id, updatedAt',
       settings: 'id',
+    });
+    // v3 (additive): program generator table. Existing tables re-declared unchanged.
+    this.version(3).stores({
+      notes: 'id, status, importedAt',
+      workouts: 'id, date, splitCanonical, blockId, sourceNoteId',
+      customExercises: 'id',
+      activeSession: 'id',
+      routines: 'id, updatedAt',
+      settings: 'id',
+      programs: 'id, updatedAt',
     });
   }
 }

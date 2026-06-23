@@ -21,6 +21,7 @@ const RoutinesPage = lazy(() => import('@/features/routines/RoutinesPage'));
 const HistoryPage = lazy(() => import('@/features/history/HistoryPage'));
 const TrendsPage = lazy(() => import('@/features/trends/TrendsPage'));
 const SettingsPage = lazy(() => import('@/features/settings/SettingsPage'));
+const ProgramPage = lazy(() => import('@/features/program/ProgramPage'));
 
 /**
  * Root route ('/'): the dashboard once there are workouts, otherwise send the
@@ -53,6 +54,7 @@ function AnimatedRoutes() {
           <Route path="/history" element={<HistoryPage />} />
           <Route path="/trends" element={<TrendsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/program" element={<ProgramPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </PageTransition>
