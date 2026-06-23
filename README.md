@@ -11,7 +11,7 @@
   <p>
     <strong>Turn your old workout notes into a coach — then log every set live.</strong>
     <br />
-    Private, offline-first strength tracking that runs entirely in your browser. No account, no API key, no server.
+    Private, offline-first strength tracking — import, log, coach, and program your training, all in your browser. No account, no server; on-device by default.
   </p>
 
   <p>
@@ -44,7 +44,7 @@
 <br />
 
 > [!NOTE]
-> **Your training data never leaves your device.** No account, no sign-up, no cloud. Everything is stored locally in your browser (IndexedDB) and works fully offline once installed.
+> **On-device by default.** No account, no sign-up, no cloud — your data lives in your browser (IndexedDB) and works fully offline once installed. The one optional exception is **AI parse**: if you choose to add your own free API key, the note text you ask it to parse is sent to that provider — nothing else, and only when you use it.
 
 ## ✨ What is RepLog?
 
@@ -53,7 +53,7 @@ RepLog is a workout tracker that does two things really well:
 1. **Imports the workout notes you already have** — screenshots, pasted text, even a screen-recording of your notes app — reads them with on-device OCR, cleans up the mess, and turns years of scattered logs into a structured training history.
 2. **Logs your workouts live** — start a session, search an exercise, and record set-by-set with previous-session hints, an auto rest timer, a plate calculator, and reusable routines.
 
-On top of that history it builds **progress charts** and a **strength coach** that scores how balanced your lifts are and tells you what to bring up.
+On top of that history it builds **progress charts**, a **trends** view (PR timeline + training-block comparison), a **strength coach** that scores how balanced your lifts are, and a **program engine** that generates a research-based weekly plan and auto-progresses it from what you lift.
 
 It is 100% client-side: a React + TypeScript app that runs in your browser, stores data on your device, and installs as a Progressive Web App on your phone or laptop. Free and open source.
 
@@ -66,8 +66,13 @@ It is 100% client-side: a React + TypeScript app that runs in your browser, stor
 - 📈 **Progress that means something** — all-time bests, estimated 1RM, and per-exercise progression graphs with metric toggles (heaviest weight, est. 1RM, volume, reps) and selectable time ranges.
 - 🗂️ **Full history** — per-session set history, bodyweight trend, training-block and split history, and a complete workout log.
 - 🧠 **Strength coach** — a 0–100 strength-balance score with per-area ring gauges, plus recommendation cards that flag underdeveloped muscles by comparing your lifts against established strength-ratio standards (e.g. overhead press vs. bench, squat vs. bench).
-- 🌐 **Installable PWA** — add it to your home screen and use it offline. No app store, no install gate.
-- 🔒 **Private by design** — no account, no API key, no server. Your data stays in your browser.
+- 📊 **Weekly volume insights** — sets per muscle over the last week vs. evidence-based MEV/MAV ranges, with "add N sets here" recommendations.
+- 🗓️ **Program engine** — generate a weekly plan from your goal, experience, days/week, split, session length, and recovery (sleep/stress). It picks exercises by muscle, sets rep ranges + RIR, **auto-progresses** with double progression + daily undulating periodization, and lets you **swap** any lift for a similar one.
+- 📅 **Trends** — a PR timeline (every weight + est-1RM record, newest first) and side-by-side **training-block comparison**.
+- 💾 **Backup & restore** — export all your data to a JSON file and import it on another device.
+- 🤖 **Optional AI parse** — for messy notes the built-in parser can't crack, bring your own free OpenRouter key (stored on your device) to extract workouts with an LLM. Fully opt-in; the deterministic parser stays the default.
+- 📱 **Web + native** — an installable PWA (offline on iOS/Android/desktop) plus a native **Expo app** in [`mobile/`](mobile/) sharing the same engine.
+- 🔒 **Private by default** — no account, no sign-up, no backend. Everything runs and stays on your device; the only optional network feature is AI parse, with your own key.
 
 ## 📸 Screenshots
 
@@ -97,12 +102,14 @@ Most people already have a training history — it's just trapped in notes apps,
 
 **Coach by the numbers.** The coach compares your key lifts against well-established strength-ratio standards and surfaces where you're out of balance — turning raw logs into a clear "here's what to work on" without any guesswork or guru opinions.
 
+**Program your training.** Beyond tracking, RepLog builds a weekly program from a few inputs — using research-based volume landmarks (MEV/MAV), goal-appropriate rep ranges, and your recovery (sleep/stress) — then progresses it automatically from what you actually lift, and swaps exercises on request. Optionally refine the plan with your own AI key.
+
 ### 🔐 Private, offline, on-device
 
 This is the part that matters most, so it's worth being explicit:
 
-- **Nothing is uploaded.** OCR, parsing, charts, and the coach all run on-device. There is no backend to send your data to.
-- **No account, no API key.** Open the app and start — there's nothing to sign up for and no key to paste.
+- **On-device by default.** OCR, parsing, charts, the coach, trends, and the program engine all run on-device — there's no backend to send your data to. The sole exception is the optional **AI parse**, which only runs when you enable it with your own key.
+- **No account, no sign-up.** Open the app and start. The built-in parser, logger, coach, trends, and program engine need no key; AI parse is the one opt-in that does.
 - **Local storage.** All your workouts live in your browser's IndexedDB. Clearing site data or uninstalling removes them; nothing lingers on a server.
 - **Works offline.** Once installed as a PWA, RepLog loads and functions without a connection.
 
@@ -179,8 +186,9 @@ Everything runs client-side. The OCR engine, the parser, the charts, and the coa
 - [x] Local **export / import** (JSON) for moving data between devices — on web and mobile; encrypted sync is next
 - [ ] Optional cross-device sync (end-to-end encrypted)
 - [ ] More import formats and smarter exercise-name normalization
-- [ ] Additional coach standards and goal-based recommendations
-- [ ] Richer progress views (PR timelines, per-block comparisons)
+- [x] **Program engine** — research-based generator + auto-progression (double progression / DUP) + exercise swap + goal-based weekly volume insights (MEV/MAV)
+- [x] **Trends** — PR timelines + per-block comparisons
+- [ ] Additional coach strength-ratio standards
 
 See the [open issues](../../issues) for the current backlog and to suggest something new.
 

@@ -52,3 +52,6 @@ tmp/
 .swarm/
 *.session.json
 *.key
+
+# internal security notes — not published
+SECURITY.md
