@@ -19,6 +19,7 @@ const CoachPage = lazy(() => import('@/features/coach/CoachPage'));
 const LoggerPage = lazy(() => import('@/features/logger/LoggerPage'));
 const RoutinesPage = lazy(() => import('@/features/routines/RoutinesPage'));
 const HistoryPage = lazy(() => import('@/features/history/HistoryPage'));
+const TrendsPage = lazy(() => import('@/features/trends/TrendsPage'));
 const SettingsPage = lazy(() => import('@/features/settings/SettingsPage'));
 
 /**
@@ -50,6 +51,7 @@ function AnimatedRoutes() {
           <Route path="/log" element={<LoggerPage />} />
           <Route path="/routines" element={<RoutinesPage />} />
           <Route path="/history" element={<HistoryPage />} />
+          <Route path="/trends" element={<TrendsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
