@@ -4,6 +4,7 @@ import type {
   ActiveSet,
   AppSettings,
   ExerciseDef,
+  PlatePreset,
   ProgramDay,
   Routine,
   Unit,
@@ -412,4 +413,68 @@ export function workingSetNumber(sets: ActiveSet[], index: number): number | nul
     if (!sets[i].isWarmup) n += 1;
   }
   return n;
+}
+
+// ---------------------------------------------------------------------------
+// Plate presets (pure)
+// ---------------------------------------------------------------------------
+
+function sortPlatesDesc(plates: number[]): number[] {
+  return [...plates].sort((a, b) => b - a);
+}
+
+/** Append a named preset from the current plate list. */
+export function addPlatePreset(
+  presets: PlatePreset[] | undefined,
+  name: string,
+  plates: number[],
+  id: string,
+): PlatePreset[] {
+  const trimmed = name.trim();
+  if (!trimmed) return presets ?? [];
+  return [...(presets ?? []), { id, name: trimmed, plates: sortPlatesDesc(plates) }];
+}
+
+/** Remove a preset by id. */
+export function deletePlatePreset(
+  presets: PlatePreset[] | undefined,
+  id: string,
+): PlatePreset[] {
+  return (presets ?? []).filter((p) => p.id !== id);
+}
+
+/** Plates to apply when a preset is selected. */
+export function platesFromPreset(preset: PlatePreset): number[] {
+  return sortPlatesDesc(preset.plates);
+}
+
+// ---------------------------------------------------------------------------
+// Superset grouping (pure)
+// ---------------------------------------------------------------------------
+
+export interface ExerciseRenderGroup {
+  supersetGroup?: string;
+  exercises: ActiveExercise[];
+}
+
+/** Group consecutive exercises that share a `supersetGroup` for rendering. */
+export function groupExercisesForRender(exercises: ActiveExercise[]): ExerciseRenderGroup[] {
+  const groups: ExerciseRenderGroup[] = [];
+  let i = 0;
+  while (i < exercises.length) {
+    const ex = exercises[i];
+    if (ex.supersetGroup) {
+      const groupId = ex.supersetGroup;
+      const members: ActiveExercise[] = [];
+      while (i < exercises.length && exercises[i].supersetGroup === groupId) {
+        members.push(exercises[i]);
+        i += 1;
+      }
+      groups.push({ supersetGroup: groupId, exercises: members });
+    } else {
+      groups.push({ exercises: [ex] });
+      i += 1;
+    }
+  }
+  return groups;
 }

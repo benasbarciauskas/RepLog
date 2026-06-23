@@ -127,6 +127,8 @@ export interface ActiveExercise {
   sets: ActiveSet[];
   restSeconds?: number;       // per-exercise rest-timer default (falls back to AppSettings)
   note?: string;
+  /** Shared id when grouped into a superset with adjacent exercises. */
+  supersetGroup?: string;
 }
 
 /** The single in-progress workout, persisted so it survives refresh. */
@@ -204,12 +206,23 @@ export interface Program {
   updatedAt: string;
 }
 
+/** A named plate inventory the user can save and re-apply in settings. */
+export interface PlatePreset {
+  id: string;
+  name: string;
+  plates: number[];
+}
+
 /** App-wide preferences for the logger (bar/plate config, rest, display unit). */
 export interface AppSettings {
   barWeightKg: number;
   availablePlatesKg: number[];
   defaultRestSeconds: number;
   unit: Unit;
+  /** Play notification / vibrate / beep when the rest timer reaches zero (default on). */
+  restAlerts?: boolean;
+  /** User-saved plate inventories for quick switching. */
+  platePresets?: PlatePreset[];
   /** User's OpenRouter API key — stored locally, never exported in backups. */
   aiApiKey?: string;
   /** OpenRouter model id for AI parse (defaults to a free tier model). */
