@@ -3,7 +3,8 @@ import type { SplitCanonical } from '@/types/models';
 
 /**
  * Pull a bodyweight reading (in kg) out of a free-text line.
- * Handles: "19 June 87ish kgs", "Weight 88", "bodyweight: 90.5kg", "BW 84kg".
+ * Handles: "19 June 87ish kgs", "Weight 88", "bodyweight: 90.5kg", "BW 84kg",
+ *          "@ 88kg", "@88", "@ 90.5 kg".
  * Returns null when no bodyweight signal is present.
  */
 export function extractBodyweight(text: string): number | null {
@@ -15,7 +16,16 @@ export function extractBodyweight(text: string): number | null {
     return parseNumber(m1[1]);
   }
 
-  // 2. "<num>ish kgs" / "<num> kgs" — a weight reading anywhere on the line.
+  // 2. @-prefixed bodyweight: "@ 88kg", "@88", "@ 90.5 kg".
+  //    Constrain to 2-3 digit values so we don't grab set weights.
+  const atPrefixed =
+    /@\s*(\d{2,3}(?:\.\d+)?)\s*(?:kgs?|kg)?\b/i;
+  const m3 = text.match(atPrefixed);
+  if (m3) {
+    return parseNumber(m3[1]);
+  }
+
+  // 3. "<num>ish kgs" / "<num> kgs" — a weight reading anywhere on the line.
   //    Require either the "ish" qualifier or a kg unit so we don't grab set weights.
   const unitMatch =
     /\b(\d{2,3}(?:\.\d+)?)\s*ish\s*(?:kgs?|kg)?\b|\b(\d{2,3}(?:\.\d+)?)\s*kgs\b/i;
@@ -67,16 +77,84 @@ export function detectSplit(text: string): { canonical: SplitCanonical; raw: str
   return { canonical: 'unknown', raw: null };
 }
 
+// Weekday prefix pattern (optional, for DD/MM date matching).
+const WEEKDAY_PREFIX = /^(?:mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?),?\s*/i;
+
 /**
- * Extract a workout date from free text. Uses chrono-node.
- * `yearHint` fills in a missing year (e.g. "13 Nov" -> "<yearHint>-11-13").
- * confidence is 'high' when chrono parsed an explicit calendar date,
- * 'low' for relative/implied references.
+ * Try to parse an explicit DD/MM numeric date from the beginning of a line.
+ * Handles: "14/10", "14/10/24", "14-10-2024", "mon 14/10", "Wed 5/4".
+ * Validates day 1-31, month 1-12.
+ * Returns null if the text doesn't match; caller should then try chrono.
+ *
+ * @param text - the line text
+ * @param yearHint - a year extracted from context (e.g. from a 4-digit year elsewhere)
+ * @param nowYear - the current calendar year, passed in from the call boundary (never read clock here)
+ */
+function parseNumericDDMM(
+  text: string,
+  yearHint?: number,
+  nowYear?: number,
+): { date: string; confidence: 'high' | 'low' } | null {
+  // Strip optional leading weekday.
+  const stripped = text.replace(WEEKDAY_PREFIX, '');
+
+  // Match DD/MM or DD/MM/YY or DD/MM/YYYY (separators: / . -)
+  // Only match at the START of the (possibly weekday-stripped) text.
+  const m = stripped.match(
+    /^(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{2,4}))?\b/,
+  );
+  if (!m) return null;
+
+  const day = Number.parseInt(m[1], 10);
+  const month = Number.parseInt(m[2], 10);
+
+  // Validate DD/MM ranges.
+  if (day < 1 || day > 31 || month < 1 || month > 12) return null;
+
+  // Parse year from the match, yearHint, or nowYear fallback.
+  let year: number | null = null;
+  let hasExplicitYear = false;
+
+  if (m[3]) {
+    const raw = Number.parseInt(m[3], 10);
+    year = m[3].length <= 2 ? 2000 + raw : raw;
+    hasExplicitYear = true;
+  } else if (yearHint != null) {
+    year = yearHint;
+  } else if (nowYear != null) {
+    year = nowYear;
+  }
+
+  if (year == null) return null;
+
+  const confidence: 'high' | 'low' = hasExplicitYear ? 'high' : 'low';
+  const date = toISODate(new Date(year, month - 1, day));
+  return { date, confidence };
+}
+
+/**
+ * Extract a workout date from free text.
+ * First tries an explicit DD/MM numeric path (UK order); if that doesn't match,
+ * falls back to chrono-node.
+ *
+ * @param text - the line text
+ * @param yearHint - a year extracted from context (fills in missing years for chrono too)
+ * @param nowYear - the current calendar year; passed in from the call boundary; never
+ *                  read the clock inside this function (keeps the parser deterministic).
+ *
+ * confidence is 'high' when an explicit calendar date was parsed,
+ * 'low' for inferred / relative references.
  */
 export function extractDate(
   text: string,
   yearHint?: number,
+  nowYear?: number,
 ): { date: string; confidence: 'high' | 'low' } | null {
+  // 1. Try explicit DD/MM path BEFORE chrono so UK order wins.
+  const numericResult = parseNumericDDMM(text, yearHint, nowYear);
+  if (numericResult) return numericResult;
+
+  // 2. Fall back to chrono for named-month dates ("26 Aug 2024", "19 June", "Nov 13").
   const ref = yearHint ? new Date(yearHint, 0, 1) : undefined;
   const results = chrono.parse(text, ref, { forwardDate: false });
   if (results.length === 0) return null;

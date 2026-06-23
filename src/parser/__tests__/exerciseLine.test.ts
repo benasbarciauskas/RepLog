@@ -90,4 +90,54 @@ describe('parseExerciseLine', () => {
     const ex = parseExerciseLine('Bench: 100x5', cat)[0];
     expect(ex.unit).toBe('kg');
   });
+
+  it('parses space-separated weight×rep tokens', () => {
+    const ex = parseExerciseLine('bench press 100x5 102.5x5 105x4', cat)[0];
+    expect(ex.sets).toEqual([
+      { weightKg: 100, reps: 5, raw: '100x5' },
+      { weightKg: 102.5, reps: 5, raw: '102.5x5' },
+      { weightKg: 105, reps: 4, raw: '105x4' },
+    ]);
+  });
+
+  it('parses slash rep-lists after a leading weight', () => {
+    const ex = parseExerciseLine('ohp 60kg 5/5/4', cat)[0];
+    expect(ex.sets).toEqual([
+      { weightKg: 60, reps: 5, raw: '5' },
+      { weightKg: 60, reps: 5, raw: '5' },
+      { weightKg: 60, reps: 4, raw: '4' },
+    ]);
+  });
+
+  it('parses bodyweight slash rep-lists', () => {
+    const ex = parseExerciseLine('pullups 12/10/8', cat)[0];
+    expect(ex.sets).toEqual([
+      { weightKg: null, reps: 12, raw: '12' },
+      { weightKg: null, reps: 10, raw: '10' },
+      { weightKg: null, reps: 8, raw: '8' },
+    ]);
+  });
+
+  it('parses WEIGHT xNxM scheme shorthand as N sets of M reps', () => {
+    const ex = parseExerciseLine('squat 140 x5x5', cat)[0];
+    expect(ex.sets).toHaveLength(5);
+    expect(ex.sets.every((s) => s.weightKg === 140 && s.reps === 5)).toBe(true);
+  });
+
+  it('parses carried-weight x-rep tokens', () => {
+    const ex = parseExerciseLine('tri pushdown 25 x12 x12 x15', cat)[0];
+    expect(ex.sets).toEqual([
+      { weightKg: 25, reps: 12, raw: 'x12' },
+      { weightKg: 25, reps: 12, raw: 'x12' },
+      { weightKg: 25, reps: 15, raw: 'x15' },
+    ]);
+  });
+
+  it('parses weight with unit followed by x-rep tokens', () => {
+    const ex = parseExerciseLine('RDL 100kg x8 x8', cat)[0];
+    expect(ex.sets).toEqual([
+      { weightKg: 100, reps: 8, raw: 'x8' },
+      { weightKg: 100, reps: 8, raw: 'x8' },
+    ]);
+  });
 });

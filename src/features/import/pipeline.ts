@@ -46,7 +46,7 @@ export function ingestCorpus(
   const warnings: string[] = [];
 
   for (const segment of kept) {
-    const result = parseNotes(segment, catalog);
+    const result = parseNotes(segment, catalog, new Date().getFullYear());
     workouts.push(...result.workouts);
     warnings.push(...result.warnings);
   }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createCatalog } from '../catalog';
 import { parseNotes } from '../parseNotes';
-import { MULTI_SESSION_NOTE, PPL_NOTE } from './fixtures/notes';
+import { MESSY_DIALECT_NOTE, MULTI_SESSION_NOTE, PPL_NOTE } from './fixtures/notes';
 
 const cat = createCatalog();
 
@@ -77,5 +77,42 @@ describe('parseNotes — multi-session note', () => {
   it('flags the inline "archers x 10" secondary exercise as a warning (not silently dropped)', () => {
     expect(result.warnings.length).toBeGreaterThan(0);
     expect(result.warnings.some((w) => /archer/i.test(w))).toBe(true);
+  });
+
+  it('still segments into exactly four workouts (regression)', () => {
+    expect(result.workouts.length).toBe(4);
+  });
+});
+
+describe('parseNotes — messy dialect smoke note', () => {
+  const result = parseNotes(MESSY_DIALECT_NOTE, cat, 2024);
+
+  it('segments into two workouts', () => {
+    expect(result.workouts.length).toBe(2);
+  });
+
+  it('parses push session on 14 Oct with bodyweight 88', () => {
+    const push = result.workouts[0];
+    expect(push.date).toBe('2024-10-14');
+    expect(push.splitCanonical).toBe('push');
+    expect(push.bodyweightKg).toBe(88);
+  });
+
+  it('captures all push-day exercises with sets', () => {
+    const push = result.workouts[0];
+    expect(push.exercises.length).toBe(3);
+    const bench = push.exercises.find((e) => e.exerciseId === 'barbell-bench-press')!;
+    expect(bench.sets).toHaveLength(3);
+    const ohp = push.exercises.find((e) => e.exerciseId === 'overhead-press')!;
+    expect(ohp.sets.map((s) => s.reps)).toEqual([5, 5, 4]);
+  });
+
+  it('parses legs session with scheme and slash-list sets', () => {
+    const legs = result.workouts[1];
+    expect(legs.splitCanonical).toBe('legs');
+    const squat = legs.exercises.find((e) => e.exerciseId === 'back-squat')!;
+    expect(squat.sets).toHaveLength(5);
+    const pullups = legs.exercises.find((e) => e.exerciseId === 'pull-up')!;
+    expect(pullups.sets.map((s) => s.reps)).toEqual([12, 10, 8]);
   });
 });

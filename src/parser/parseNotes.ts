@@ -2,15 +2,26 @@ import type { ParseResult, ParsedWorkout, WorkoutExercise } from '@/types/models
 import type { ExerciseCatalog } from './catalog';
 import { parseExerciseLine } from './exerciseLine';
 import { detectSplit, extractBodyweight, extractDate } from './fields';
-import { segmentWorkouts } from './segment';
+import { isSessionHeader, segmentWorkouts } from './segment';
 import { preprocessStructured } from './structured';
 
 /**
  * Top-level entry point: parse a raw note (one or many sessions) into candidate
  * workouts plus a list of warnings for ambiguous / un-parsed remainders so the
  * review UI can surface them instead of silently dropping data.
+ *
+ * @param rawText - the raw note text
+ * @param catalog - the exercise catalog for name resolution
+ * @param nowYear - the current calendar year, sourced ONCE at the call boundary.
+ *                  Used as a fallback when yearless DD/MM dates appear and no
+ *                  year is available from context. Keeping it here (not inside
+ *                  the parser modules) ensures the parser stays deterministic.
  */
-export function parseNotes(rawText: string, catalog: ExerciseCatalog): ParseResult {
+export function parseNotes(
+  rawText: string,
+  catalog: ExerciseCatalog,
+  nowYear?: number,
+): ParseResult {
   const warnings: string[] = [];
   const workouts: ParsedWorkout[] = [];
 
@@ -44,7 +55,7 @@ export function parseNotes(rawText: string, catalog: ExerciseCatalog): ParseResu
 
       // Date (first explicit date in the chunk wins).
       if (date === null) {
-        const d = extractDate(line, yearHint);
+        const d = extractDate(line, yearHint, nowYear);
         if (d) {
           date = d.date;
           dateConfidence = d.confidence;
@@ -60,7 +71,9 @@ export function parseNotes(rawText: string, catalog: ExerciseCatalog): ParseResu
         }
       }
 
-      // Exercise line.
+      // Exercise line (skip session headers and bodyweight-only lines).
+      if (isSessionHeader(line) || !looksLikeSetLine(line)) continue;
+
       const parsed = parseExerciseLine(line, catalog);
       if (parsed.length > 0) {
         exercises.push(...parsed);
@@ -93,8 +106,13 @@ function findYearHint(text: string): number | undefined {
 
 /** Heuristic: does this line carry set data (weights/reps)? */
 function looksLikeSetLine(line: string): boolean {
-  // A weight×reps token, or a "Name: <digits>x<digits>" exercise line.
-  return /\d+\s*(?:kgs?)?\s*[x×]\s*\d+/i.test(line) || /:\s*\d[\d.]*\s*(?:kgs?)?\s*[x×,]/i.test(line);
+  return (
+    /\d+\s*(?:kgs?)?\s*[x×]\s*\d+/i.test(line) ||
+    /:\s*\d[\d.]*\s*(?:kgs?)?\s*[x×,]/i.test(line) ||
+    /\d+\s*(?:kgs?|kg)\s+\d+\/\d+/i.test(line) ||
+    /\d+\s+[x×]\d+[x×]\d+/i.test(line) ||
+    /\b\d+\/\d+(?:\/\d+)+\b/.test(line)
+  );
 }
 
 /**
