@@ -20,13 +20,13 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { newId } from '@/lib/id';
-import { repository } from '@/data/repository';
+import { DEFAULT_SETTINGS, repository } from '@/data/repository';
 import type { NoteSource, RawNote } from '@/types/models';
 import { imageToText } from '@/ocr/ocr';
 import { stitchOcrText } from '@/ocr/stitch';
 import { VideoDecodeError, videoToFrames } from '@/ocr/video';
 import { useSettings, useWorkouts } from '@/data/hooks';
-import { aiParseWorkouts } from '@/ai/openrouter';
+import { VISION_IMAGE_CAP, aiParseWorkouts, aiParseWorkoutsFromImages } from '@/ai/openrouter';
 import { createCatalog } from '@/parser';
 import { TrySampleDataButton } from '@/features/data/DataActions';
 import { ingestCorpus } from './pipeline';
@@ -176,6 +176,65 @@ export default function ImportPage() {
     },
     [navigate, settings?.aiApiKey, settings?.aiModel],
   );
+
+  const aiVisionParse = useCallback(async () => {
+    if (!settings?.aiApiKey) {
+      toast.error('Add your OpenRouter key in Settings to use AI parse.');
+      return;
+    }
+    if (images.length === 0 || busy) return;
+
+    setBusy(true);
+    setProgress({ value: null, label: 'AI reading screenshots…' });
+    try {
+      if (images.length > VISION_IMAGE_CAP) {
+        toast.info('Lots of screenshots', {
+          description: `We sent the first ${VISION_IMAGE_CAP} images to the AI. Read the rest in a second batch for full coverage.`,
+        });
+      }
+
+      const dataUrls = await Promise.all(images.map(readFileAsDataUrl));
+      const custom = await repository.getCustomExercises();
+      const catalog = createCatalog(custom);
+      const parsed = await aiParseWorkoutsFromImages(
+        dataUrls,
+        {
+          apiKey: settings.aiApiKey,
+          model: settings.aiVisionModel || DEFAULT_SETTINGS.aiVisionModel!,
+        },
+        catalog,
+      );
+
+      if (parsed.length === 0) {
+        toast.error('AI did not find a workout in those images.');
+        return;
+      }
+
+      const note: RawNote = {
+        id: newId(),
+        sourceType: 'screenshot',
+        rawText: '[AI vision import]',
+        importedAt: new Date().toISOString(),
+        status: 'needs-review',
+      };
+      void repository.addNote(note);
+
+      const state: ReviewRouteState & { tag: typeof REVIEW_STATE_TAG } = {
+        tag: REVIEW_STATE_TAG,
+        workouts: parsed,
+        skippedCount: 0,
+        skipped: [],
+        warnings: ['Parsed with AI from screenshots — double-check the numbers before saving.'],
+        sourceLabels: images.map((f) => f.name),
+      };
+      navigate('/review', { state });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'AI parse failed.');
+    } finally {
+      setBusy(false);
+      setProgress(IDLE);
+    }
+  }, [navigate, settings?.aiApiKey, settings?.aiVisionModel, images, busy]);
 
   // --- Screenshots → OCR each → corpus -------------------------------------
   const parseScreenshots = useCallback(async () => {
@@ -337,25 +396,49 @@ export default function ImportPage() {
           </motion.div>
         ) : null}
 
-        <div className="flex flex-wrap justify-end gap-2">
-          {mode === 'paste' && settings?.aiApiKey ? (
-            <motion.div whileTap={reduce || busy || !pasteText.trim() ? undefined : { scale: 0.97 }}>
-              <Button
-                size="lg"
-                variant="outline"
-                onClick={() => void aiParse(pasteText)}
-                disabled={busy || pasteText.trim().length === 0}
-              >
-                {busy ? (
-                  <Loader2 className="animate-spin" aria-hidden />
-                ) : (
-                  <ScanText aria-hidden />
-                )}
-                {busy ? 'Working…' : 'AI parse'}
-              </Button>
-            </motion.div>
+        <div className="flex flex-col items-end gap-2">
+          {mode === 'screenshots' && settings?.aiApiKey && images.length > 0 ? (
+            <div className="flex w-full flex-col items-end gap-1">
+              <motion.div whileTap={reduce || busy ? undefined : { scale: 0.97 }}>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => void aiVisionParse()}
+                  disabled={busy}
+                >
+                  {busy ? (
+                    <Loader2 className="animate-spin" aria-hidden />
+                  ) : (
+                    <ScanText aria-hidden />
+                  )}
+                  {busy ? 'Working…' : 'Read with AI'}
+                </Button>
+              </motion.div>
+              <p className="text-xs text-muted-foreground">
+                Sends the image to OpenRouter with your key.
+              </p>
+            </div>
           ) : null}
-          <ParseButton mode={mode} busy={busy} reduce={reduce} onClick={runForMode(mode, { parseScreenshots, parsePaste, parseVideo })} disabled={isDisabled(mode, { images, pasteText, videoFile, busy })} />
+          <div className="flex flex-wrap justify-end gap-2">
+            {mode === 'paste' && settings?.aiApiKey ? (
+              <motion.div whileTap={reduce || busy || !pasteText.trim() ? undefined : { scale: 0.97 }}>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => void aiParse(pasteText)}
+                  disabled={busy || pasteText.trim().length === 0}
+                >
+                  {busy ? (
+                    <Loader2 className="animate-spin" aria-hidden />
+                  ) : (
+                    <ScanText aria-hidden />
+                  )}
+                  {busy ? 'Working…' : 'AI parse'}
+                </Button>
+              </motion.div>
+            ) : null}
+            <ParseButton mode={mode} busy={busy} reduce={reduce} onClick={runForMode(mode, { parseScreenshots, parsePaste, parseVideo })} disabled={isDisabled(mode, { images, pasteText, videoFile, busy })} />
+          </div>
         </div>
       </div>
 
@@ -371,6 +454,15 @@ export default function ImportPage() {
       ) : null}
     </div>
   );
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error('Could not read that image.'));
+    reader.readAsDataURL(file);
+  });
 }
 
 function runForMode(

@@ -116,8 +116,13 @@ function mapWorkout(raw: AiWorkout, catalog: ExerciseCatalog): ParsedWorkout | n
   };
 }
 
-export async function aiParseWorkouts(
-  text: string,
+type OpenRouterMessage = {
+  role: 'system' | 'user';
+  content: string | { type: string; text?: string; image_url?: { url: string } }[];
+};
+
+async function requestAndMap(
+  messages: OpenRouterMessage[],
   opts: { apiKey: string; model: string },
   catalog: ExerciseCatalog,
 ): Promise<ParsedWorkout[]> {
@@ -137,10 +142,7 @@ export async function aiParseWorkouts(
         model,
         temperature: 0,
         response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: text },
-        ],
+        messages,
       }),
     });
   } catch {
@@ -183,4 +185,51 @@ export async function aiParseWorkouts(
   return parsed.workouts
     .map((w) => mapWorkout(w, catalog))
     .filter((w): w is ParsedWorkout => w !== null);
+}
+
+export async function aiParseWorkouts(
+  text: string,
+  opts: { apiKey: string; model: string },
+  catalog: ExerciseCatalog,
+): Promise<ParsedWorkout[]> {
+  return requestAndMap(
+    [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: text },
+    ],
+    opts,
+    catalog,
+  );
+}
+
+export const VISION_IMAGE_CAP = 8; // OpenRouter vision models cap at 8 images per request
+
+export async function aiParseWorkoutsFromImages(
+  images: string[],
+  opts: { apiKey: string; model: string },
+  catalog: ExerciseCatalog,
+): Promise<ParsedWorkout[]> {
+  if (images.length === 0) {
+    throw new Error('At least one image is required.');
+  }
+
+  const capped = images.slice(0, VISION_IMAGE_CAP);
+
+  return requestAndMap(
+    [
+      { role: 'system', content: SYSTEM_PROMPT },
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'text',
+            text: 'Extract all workouts from the following image(s). Return structured JSON with the same format as the system prompt specifies.',
+          },
+          ...capped.map((url) => ({ type: 'image_url' as const, image_url: { url } })),
+        ],
+      },
+    ],
+    opts,
+    catalog,
+  );
 }
