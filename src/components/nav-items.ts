@@ -6,6 +6,7 @@ import {
   ListChecks,
   History,
   ClipboardCheck,
+  Settings,
   type LucideProps,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
@@ -35,6 +36,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/routines', label: 'Routines', icon: ListChecks, primary: false },
   { to: '/import', label: 'Import', icon: Upload, primary: false },
   { to: '/review', label: 'Review', icon: ClipboardCheck, primary: false },
+  { to: '/settings', label: 'Settings', icon: Settings, primary: false },
 ];
 
 /** The route that gets the prominent centre slot in the mobile bottom nav. */
