@@ -19,7 +19,7 @@ const ohpBench = RATIO_RULES.find((r) => r.id === 'ohp-bench')!;
 
 describe('scoreRatio', () => {
   it('gives full credit (100) for an in-band ratio', () => {
-    // ohp-bench healthy band is [0.6, 0.67]. 0.63 is inside.
+    // ohp-bench healthy band is [0.6, 0.7]. 0.63 is inside.
     expect(scoreRatio(0.63, ohpBench)).toBe(100);
     expect(scoreRatio(ohpBench.healthyMin, ohpBench)).toBe(100);
     expect(scoreRatio(ohpBench.healthyMax, ohpBench)).toBe(100);
@@ -123,6 +123,38 @@ describe('balanceScore', () => {
       best('weighted-pull-up', 5), // pullup-bench 0.05 → 0, low weight
     ]);
     expect(result.overall!).toBeGreaterThan(60);
+  });
+});
+
+describe('balanceScore — new ratio rules', () => {
+  it('lowers overall score when weighted pull-up lags barbell row (pullup-row)', () => {
+    const inBand = balanceScore([
+      best('barbell-row', 100),
+      best('weighted-pull-up', 100),
+    ]);
+    const outOfBand = balanceScore([
+      best('barbell-row', 100),
+      best('weighted-pull-up', 50),
+    ]);
+    expect(outOfBand.overall!).toBeLessThan(inBand.overall!);
+    const pull = outOfBand.areas.find((a) => a.key === 'pull');
+    expect(pull).toBeDefined();
+    expect(pull!.score!).toBeLessThan(75);
+  });
+
+  it('lowers overall score when Romanian deadlift lags back squat (rdl-squat)', () => {
+    const inBand = balanceScore([
+      best('back-squat', 150),
+      best('romanian-deadlift', 127.5),
+    ]);
+    const outOfBand = balanceScore([
+      best('back-squat', 150),
+      best('romanian-deadlift', 90),
+    ]);
+    expect(outOfBand.overall!).toBeLessThan(inBand.overall!);
+    const lower = outOfBand.areas.find((a) => a.key === 'lower');
+    expect(lower).toBeDefined();
+    expect(lower!.score!).toBeLessThan(75);
   });
 });
 

@@ -51,6 +51,7 @@ const EXERCISE_MUSCLES: Record<string, MuscleGroup[]> = {
   'back-squat': ['quads', 'glutes', 'lower-back', 'abs'],
   'front-squat': ['quads', 'glutes', 'upper-back', 'abs'],
   deadlift: ['hamstrings', 'glutes', 'lower-back', 'quads', 'traps', 'forearms'],
+  'romanian-deadlift': ['hamstrings', 'glutes', 'lower-back'],
 };
 
 /** Round to 2dp for stable message strings. */
@@ -110,6 +111,7 @@ function exerciseLabel(id: string): string {
     'weighted-pull-up': 'weighted pull-up',
     'incline-bench': 'incline bench',
     'front-squat': 'front squat',
+    'romanian-deadlift': 'Romanian deadlift',
   };
   return labels[id] ?? id;
 }

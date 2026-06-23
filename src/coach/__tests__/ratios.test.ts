@@ -4,19 +4,21 @@ import type { MuscleGroup } from '@/types/models';
 
 const HIGH_CONFIDENCE_IDS = ['ohp-bench', 'squat-bench', 'frontsquat-backsquat'];
 
+const EXPECTED_RULE_IDS = [
+  'ohp-bench',
+  'row-bench',
+  'squat-bench',
+  'deadlift-squat',
+  'pullup-bench',
+  'pullup-row',
+  'incline-flat',
+  'frontsquat-backsquat',
+  'rdl-squat',
+];
+
 describe('RATIO_RULES', () => {
-  it('defines all seven verified rules with the expected ids', () => {
-    expect(RATIO_RULES.map((r) => r.id).sort()).toEqual(
-      [
-        'ohp-bench',
-        'row-bench',
-        'squat-bench',
-        'deadlift-squat',
-        'pullup-bench',
-        'incline-flat',
-        'frontsquat-backsquat',
-      ].sort(),
-    );
+  it('defines all verified rules with the expected ids', () => {
+    expect(RATIO_RULES.map((r) => r.id).sort()).toEqual([...EXPECTED_RULE_IDS].sort());
   });
 
   it('uses canonical exerciseIds that match the parser/catalog', () => {
@@ -29,6 +31,7 @@ describe('RATIO_RULES', () => {
       'weighted-pull-up',
       'incline-bench',
       'front-squat',
+      'romanian-deadlift',
     ]);
     for (const rule of RATIO_RULES) {
       expect(canonicalIds.has(rule.numerator)).toBe(true);
@@ -41,20 +44,22 @@ describe('RATIO_RULES', () => {
     expect(high.sort()).toEqual([...HIGH_CONFIDENCE_IDS].sort());
   });
 
-  it('uses the verified bands from the research doc', () => {
+  it('uses the verified bands from established strength-ratio references', () => {
     const byId = Object.fromEntries(RATIO_RULES.map((r) => [r.id, r]));
-    expect([byId['ohp-bench'].healthyMin, byId['ohp-bench'].healthyMax]).toEqual([0.6, 0.67]);
-    expect([byId['row-bench'].healthyMin, byId['row-bench'].healthyMax]).toEqual([0.75, 0.9]);
+    expect([byId['ohp-bench'].healthyMin, byId['ohp-bench'].healthyMax]).toEqual([0.6, 0.7]);
+    expect([byId['row-bench'].healthyMin, byId['row-bench'].healthyMax]).toEqual([0.7, 0.9]);
     expect([byId['squat-bench'].healthyMin, byId['squat-bench'].healthyMax]).toEqual([1.3, 1.5]);
     expect([byId['deadlift-squat'].healthyMin, byId['deadlift-squat'].healthyMax]).toEqual([
-      1.15, 1.25,
+      1.1, 1.3,
     ]);
     expect([byId['pullup-bench'].healthyMin, byId['pullup-bench'].healthyMax]).toEqual([0.9, 1.2]);
+    expect([byId['pullup-row'].healthyMin, byId['pullup-row'].healthyMax]).toEqual([0.9, 1.1]);
     expect([byId['incline-flat'].healthyMin, byId['incline-flat'].healthyMax]).toEqual([0.8, 0.9]);
     expect([
       byId['frontsquat-backsquat'].healthyMin,
       byId['frontsquat-backsquat'].healthyMax,
-    ]).toEqual([0.8, 0.9]);
+    ]).toEqual([0.8, 0.85]);
+    expect([byId['rdl-squat'].healthyMin, byId['rdl-squat'].healthyMax]).toEqual([0.8, 1.0]);
   });
 
   it('attaches deficit muscles to every rule', () => {
