@@ -2,11 +2,20 @@ import type {
   ActiveExercise,
   ActiveSession,
   ActiveSet,
+  AppSettings,
+  ExerciseDef,
   ProgramDay,
   Routine,
+  Unit,
   Workout,
 } from '@/types/models';
 import { newId } from '@/lib/id';
+import { formatWeight } from '@/lib/units';
+import {
+  incrementForExercise,
+  suggestNextSet,
+  type SetSuggestion,
+} from '@/program/progression';
 
 // ---------------------------------------------------------------------------
 // Plate calculator (pure)
@@ -233,6 +242,72 @@ export function sessionFromProgramDay(day: ProgramDay): ActiveSession {
       }),
     ),
   };
+}
+
+function seededSetsFromSuggestion(
+  targetSets: number,
+  suggestion: SetSuggestion | null,
+  fallbackReps: number,
+): ActiveSet[] {
+  return Array.from({ length: targetSets }, () => {
+    const set = makeEmptySet();
+    if (suggestion) {
+      set.weightKg = suggestion.weightKg;
+      set.reps = suggestion.reps;
+    } else {
+      set.reps = fallbackReps;
+    }
+    return set;
+  });
+}
+
+/**
+ * Seed an `ActiveSession` from a program day with double-progression suggestions
+ * pre-filled on each set row (weight + reps when history exists).
+ */
+export function sessionFromProgramDayWithProgression(
+  day: ProgramDay,
+  pastWorkouts: Workout[],
+  settings: AppSettings,
+  catalog: ExerciseDef[],
+): ActiveSession {
+  const catalogById = new Map(catalog.map((e) => [e.id, e]));
+
+  return {
+    id: newId(),
+    startedAt: new Date().toISOString(),
+    routineId: null,
+    bodyweightKg: null,
+    splitCanonical: day.splitCanonical,
+    exercises: day.exercises.map((e) => {
+      const def = catalogById.get(e.exerciseId);
+      const suggestion = suggestNextSet(pastWorkouts, e.exerciseId, {
+        repRange: e.repRange,
+        rir: e.rir,
+        incrementKg: incrementForExercise(def, settings),
+      });
+
+      return {
+        id: newId(),
+        exerciseId: e.exerciseId,
+        rawName: e.rawName,
+        unit: settings.unit,
+        restSeconds: e.restSeconds,
+        sets: seededSetsFromSuggestion(e.targetSets, suggestion, e.repRange[0]),
+      };
+    }),
+  };
+}
+
+/** Format a progression suggestion for program-day preview ("100 kg × 8" or "× 12"). */
+export function formatNextSetSuggestion(
+  suggestion: SetSuggestion | null,
+  repRange: [number, number],
+  unit: Unit,
+): string {
+  if (!suggestion) return `× ${repRange[0]}`;
+  if (suggestion.weightKg === null) return `× ${suggestion.reps}`;
+  return `${formatWeight(suggestion.weightKg, unit)} × ${suggestion.reps}`;
 }
 
 export function sessionFromRoutine(routine: Routine): ActiveSession {

@@ -6,13 +6,17 @@ import { PageHeader } from '@/components/PageHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { useActiveProgram, useActiveSession, useSettings } from '@/data/hooks';
+import { useActiveProgram, useActiveSession, useSettings, useWorkouts } from '@/data/hooks';
 import { repository } from '@/data/repository';
 import { refineProgram } from '@/ai/refineProgram';
 import { createCatalog } from '@/parser/catalog';
-import { sessionFromProgramDay } from '@/features/logger/lib';
+import {
+  formatNextSetSuggestion,
+  sessionFromProgramDayWithProgression,
+} from '@/features/logger/lib';
+import { incrementForExercise, suggestNextSet } from '@/program/progression';
 import { ConfirmDialog } from '@/features/logger/ConfirmDialog';
-import type { Program, ProgramDay } from '@/types/models';
+import type { Program, ProgramDay, ProgramDayExercise } from '@/types/models';
 import { ProgramWizard } from './ProgramWizard';
 
 function configSummary(program: Program): string {
@@ -28,10 +32,26 @@ function exerciseLine(ex: ProgramDay['exercises'][number]): string {
   return `${ex.targetSets}×${ex.repRange[0]}–${ex.repRange[1]} @ RIR ${ex.rir}`;
 }
 
+function nextSetLabel(
+  ex: ProgramDayExercise,
+  workouts: ReturnType<typeof useWorkouts>,
+  settings: ReturnType<typeof useSettings>,
+  catalog: ReturnType<typeof createCatalog>,
+): string {
+  const def = catalog.all().find((d) => d.id === ex.exerciseId);
+  const suggestion = suggestNextSet(workouts, ex.exerciseId, {
+    repRange: ex.repRange,
+    rir: ex.rir,
+    incrementKg: incrementForExercise(def, settings),
+  });
+  return formatNextSetSuggestion(suggestion, ex.repRange, settings.unit);
+}
+
 export default function ProgramPage() {
   const program = useActiveProgram();
   const activeSession = useActiveSession();
   const settings = useSettings();
+  const workouts = useWorkouts();
   const navigate = useNavigate();
   const catalog = useMemo(() => createCatalog(), []);
 
@@ -43,7 +63,9 @@ export default function ProgramPage() {
   const hasAiKey = Boolean(settings.aiApiKey?.trim());
 
   async function doStartDay(day: ProgramDay) {
-    await repository.saveActiveSession(sessionFromProgramDay(day));
+    await repository.saveActiveSession(
+      sessionFromProgramDayWithProgression(day, workouts, settings, catalog.all()),
+    );
     navigate('/log');
   }
 
@@ -175,7 +197,12 @@ export default function ProgramPage() {
                       key={ex.exerciseId}
                       className="flex items-start justify-between gap-3 border-b border-border/50 pb-2 last:border-0 last:pb-0"
                     >
-                      <span className="font-medium text-foreground">{ex.rawName}</span>
+                      <div className="min-w-0">
+                        <span className="font-medium text-foreground">{ex.rawName}</span>
+                        <p className="tnum text-xs text-muted-foreground">
+                          next: {nextSetLabel(ex, workouts, settings, catalog)}
+                        </p>
+                      </div>
                       <span className="tnum shrink-0 text-xs text-muted-foreground">
                         {exerciseLine(ex)}
                       </span>

@@ -9,6 +9,7 @@ let activeSession: ActiveSession | undefined;
 vi.mock('@/data/hooks', () => ({
   useActiveProgram: () => activeProgram,
   useActiveSession: () => activeSession,
+  useWorkouts: () => [],
   useSettings: () => ({ unit: 'kg', barWeightKg: 20, availablePlatesKg: [20], defaultRestSeconds: 120 }),
 }));
 
@@ -112,5 +113,7 @@ describe('ProgramPage', () => {
     expect(seeded.splitCanonical).toBe('full-body');
     expect(seeded.exercises[0].exerciseId).toBe('barbell-bench-press');
     expect(seeded.exercises[0].sets).toHaveLength(3);
+    expect(seeded.exercises[0].sets[0].weightKg).toBeNull();
+    expect(seeded.exercises[0].sets[0].reps).toBe(8);
   });
 });

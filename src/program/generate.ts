@@ -7,6 +7,7 @@ import type {
   ProgramConfig,
   ProgramDay,
   ProgramDayExercise,
+  ProgramDayIntensity,
   ProgramGoal,
   SplitCanonical,
 } from '@/types/models';
@@ -468,6 +469,75 @@ function fillDeficitsAfterTrim(
   return result;
 }
 
+const INTENSITY_CYCLE_3: ProgramDayIntensity[] = ['heavy', 'moderate', 'light'];
+const INTENSITY_CYCLE_2: ProgramDayIntensity[] = ['heavy', 'light'];
+
+function intensitiesForOccurrenceCount(count: number): ProgramDayIntensity[] {
+  if (count <= 1) return ['moderate'];
+  if (count === 2) return INTENSITY_CYCLE_2;
+  if (count === 3) return INTENSITY_CYCLE_3;
+  return Array.from({ length: count }, (_, i) => INTENSITY_CYCLE_3[i % 3]);
+}
+
+function shiftRepRangeForIntensity(
+  base: [number, number],
+  intensity: ProgramDayIntensity,
+): [number, number] {
+  if (intensity === 'moderate') return base;
+  if (intensity === 'heavy') {
+    return [Math.max(base[0] - 3, 3), Math.max(base[1] - 3, 6)];
+  }
+  return [base[0] + 3, base[1] + 4];
+}
+
+function shiftRirForIntensity(baseRir: number, intensity: ProgramDayIntensity): number {
+  if (intensity === 'heavy') return Math.max(baseRir - 1, 0);
+  return baseRir;
+}
+
+function intensityLabel(intensity: ProgramDayIntensity): string {
+  return intensity.charAt(0).toUpperCase() + intensity.slice(1);
+}
+
+/**
+ * Daily undulating periodization: when a day-type repeats within the week,
+ * cycle heavy / moderate / light and shift rep ranges + RIR accordingly.
+ * Volume (set counts) is unchanged.
+ */
+function applyDupToDays(days: ProgramDay[], blueprints: DayBlueprint[]): ProgramDay[] {
+  const occurrenceCounts = new Map<SplitCanonical, number>();
+  for (const bp of blueprints) {
+    occurrenceCounts.set(
+      bp.splitCanonical,
+      (occurrenceCounts.get(bp.splitCanonical) ?? 0) + 1,
+    );
+  }
+
+  const occurrenceIndex = new Map<SplitCanonical, number>();
+
+  return days.map((day, i) => {
+    const bp = blueprints[i];
+    const count = occurrenceCounts.get(bp.splitCanonical) ?? 1;
+    if (count <= 1) return day;
+
+    const intensities = intensitiesForOccurrenceCount(count);
+    const idx = occurrenceIndex.get(bp.splitCanonical) ?? 0;
+    occurrenceIndex.set(bp.splitCanonical, idx + 1);
+    const intensity = intensities[idx];
+
+    return {
+      ...day,
+      name: `${day.name} · ${intensityLabel(intensity)}`,
+      intensity,
+      exercises: day.exercises.map((ex) => ({
+        ...ex,
+        repRange: shiftRepRangeForIntensity(ex.repRange, intensity),
+        rir: shiftRirForIntensity(ex.rir, intensity),
+      })),
+    };
+  });
+}
+
 function trimToTimeBudget(
   exercises: ProgramDayExercise[],
   catalogById: Map<string, ExerciseDef>,
@@ -525,23 +595,26 @@ export function generateProgram(
   const dayCounts = muscleDayCounts(blueprints);
   const catalogById = new Map(catalog.map((e) => [e.id, e]));
 
-  const days: ProgramDay[] = blueprints.map((bp) => {
-    const targets = dayMuscleTargets(bp, weeklyTarget, dayCounts);
-    let exercises = selectExercisesForDay(targets, catalog, config.goal);
-    exercises = trimToTimeBudget(exercises, catalogById, config.minutesPerSession);
-    exercises = fillDeficitsAfterTrim(
-      exercises,
-      targets,
-      catalog,
-      config.goal,
-      config.minutesPerSession,
-    );
-    return {
-      name: bp.name,
-      splitCanonical: bp.splitCanonical,
-      exercises,
-    };
-  });
+  const days: ProgramDay[] = applyDupToDays(
+    blueprints.map((bp) => {
+      const targets = dayMuscleTargets(bp, weeklyTarget, dayCounts);
+      let exercises = selectExercisesForDay(targets, catalog, config.goal);
+      exercises = trimToTimeBudget(exercises, catalogById, config.minutesPerSession);
+      exercises = fillDeficitsAfterTrim(
+        exercises,
+        targets,
+        catalog,
+        config.goal,
+        config.minutesPerSession,
+      );
+      return {
+        name: bp.name,
+        splitCanonical: bp.splitCanonical,
+        exercises,
+      };
+    }),
+    blueprints,
+  );
 
   const goalLabel = config.goal === 'hypertrophy' ? 'Hypertrophy' : 'Strength';
 
@@ -574,8 +647,9 @@ export function weeklyMuscleVolume(
     volume.set(m, (volume.get(m) ?? 0) + sets);
   };
 
-  for (const day of program.days) {
-    const bp = blueprints.find((b) => b.name === day.name);
+  for (let i = 0; i < program.days.length; i += 1) {
+    const day = program.days[i];
+    const bp = blueprints[i];
     if (!bp) continue;
     const remaining = dayMuscleTargets(bp, weeklyTarget, dayCounts);
 
