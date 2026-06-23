@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Download, ExternalLink, Plus, Upload, X } from 'lucide-react';
+import { Download, ExternalLink, FileDown, Plus, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { SegmentedControl } from '@/features/exercise/SegmentedControl';
 import { useSettings } from '@/data/hooks';
 import { DEFAULT_SETTINGS, repository } from '@/data/repository';
+import { workoutsToCsv } from '@/data/csv';
 import { formatWeight } from '@/lib/units';
 import type { AppSettings, Unit } from '@/types/models';
 import { BETA_AVAILABLE, CHANNEL_URLS, type Channel, detectChannel } from './channel';
@@ -28,6 +29,7 @@ export default function SettingsPage() {
   // Local draft for the "add a plate" input.
   const [newPlate, setNewPlate] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [exportingCsv, setExportingCsv] = useState(false);
 
   function save(patch: Partial<AppSettings>) {
     void repository.saveSettings({ ...settings, ...patch });
@@ -65,6 +67,32 @@ export default function SettingsPage() {
       toast.error(err instanceof Error ? err.message : 'Could not export data');
     } finally {
       setExporting(false);
+    }
+  }
+
+  async function handleExportCsv() {
+    if (exportingCsv) return;
+    setExportingCsv(true);
+    try {
+      const workouts = await repository.getWorkouts();
+      const csv = workoutsToCsv(workouts, settings.unit);
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const date = new Date().toISOString().slice(0, 10);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `replog-export-${date}.csv`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      const setCount = workouts.reduce(
+        (acc, w) => acc + w.exercises.reduce((a, e) => a + e.sets.length, 0),
+        0,
+      );
+      toast.success(`Exported ${setCount} sets to CSV`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not export CSV');
+    } finally {
+      setExportingCsv(false);
     }
   }
 
@@ -368,6 +396,16 @@ export default function SettingsPage() {
             >
               <Download className="size-4" strokeWidth={2} aria-hidden />
               {exporting ? 'Exporting…' : 'Export data'}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleExportCsv}
+              disabled={exportingCsv}
+            >
+              <FileDown className="size-4" strokeWidth={2} aria-hidden />
+              {exportingCsv ? 'Exporting…' : 'Export CSV'}
             </Button>
             <div className="relative">
               <Button type="button" variant="outline" size="sm" className="pointer-events-none">
