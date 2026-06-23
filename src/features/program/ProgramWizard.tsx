@@ -10,7 +10,9 @@ import type {
   Program,
   ProgramConfig,
   ProgramGoal,
+  SleepQuality,
   SplitChoice,
+  StressLevel,
 } from '@/types/models';
 import { toast } from 'sonner';
 
@@ -44,12 +46,26 @@ const SPLIT_OPTIONS: { value: SplitChoice; label: string }[] = [
   { value: 'upper-lower', label: 'Upper/Lower' },
 ];
 
+const SLEEP_OPTIONS: { value: SleepQuality; label: string }[] = [
+  { value: 'poor', label: 'Poor' },
+  { value: 'average', label: 'Average' },
+  { value: 'good', label: 'Good' },
+];
+
+const STRESS_OPTIONS: { value: StressLevel; label: string }[] = [
+  { value: 'low', label: 'Low' },
+  { value: 'moderate', label: 'Moderate' },
+  { value: 'high', label: 'High' },
+];
+
 const DEFAULT_CONFIG: ProgramConfig = {
   goal: 'hypertrophy',
   experience: 'beginner',
   daysPerWeek: 3,
   split: 'auto',
   minutesPerSession: 60,
+  sleep: 'average',
+  stress: 'moderate',
 };
 
 export interface ProgramWizardProps {
@@ -149,6 +165,31 @@ export function ProgramWizard({ onGenerated }: ProgramWizardProps) {
           size="full"
           scroll
         />
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-foreground">Sleep</label>
+        <SegmentedControl
+          ariaLabel="Sleep quality"
+          options={SLEEP_OPTIONS}
+          value={config.sleep ?? 'average'}
+          onChange={(v) => patch('sleep', v)}
+          size="full"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-foreground">Stress</label>
+        <SegmentedControl
+          ariaLabel="Stress level"
+          options={STRESS_OPTIONS}
+          value={config.stress ?? 'moderate'}
+          onChange={(v) => patch('stress', v)}
+          size="full"
+        />
+        <p className="text-xs text-muted-foreground">
+          Lower recovery slightly reduces prescribed volume.
+        </p>
       </div>
 
       <Button type="submit" className="w-full" disabled={busy}>

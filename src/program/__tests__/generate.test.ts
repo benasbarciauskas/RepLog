@@ -254,4 +254,80 @@ describe('generateProgram', () => {
       expect(minutes).toBeLessThanOrEqual(45 + MINUTES_PER_SET);
     }
   });
+
+  it('poor sleep + high stress reduces weekly volume vs average/moderate baseline', () => {
+    const baseline = makeConfig({
+      experience: 'intermediate',
+      daysPerWeek: 4,
+      split: 'upper-lower',
+      minutesPerSession: 180,
+      sleep: 'average',
+      stress: 'moderate',
+    });
+    const poorRecovery = makeConfig({
+      ...baseline,
+      sleep: 'poor',
+      stress: 'high',
+    });
+
+    const baselineVol = weeklyMuscleVolume(generateProgram(baseline, CATALOG, { now: NOW }), CATALOG);
+    const poorVol = weeklyMuscleVolume(generateProgram(poorRecovery, CATALOG, { now: NOW }), CATALOG);
+
+    for (const muscle of TRAINED_MUSCLES) {
+      const baseSets = baselineVol.get(muscle) ?? 0;
+      const poorSets = poorVol.get(muscle) ?? 0;
+      if (baseSets === 0) continue;
+      expect(poorSets).toBeLessThan(baseSets);
+    }
+  });
+
+  it('good sleep + low stress slightly increases weekly volume vs baseline', () => {
+    const baseline = makeConfig({
+      experience: 'intermediate',
+      daysPerWeek: 4,
+      split: 'upper-lower',
+      minutesPerSession: 180,
+      sleep: 'average',
+      stress: 'moderate',
+    });
+    const goodRecovery = makeConfig({
+      ...baseline,
+      sleep: 'good',
+      stress: 'low',
+    });
+
+    const baselineVol = weeklyMuscleVolume(generateProgram(baseline, CATALOG, { now: NOW }), CATALOG);
+    const goodVol = weeklyMuscleVolume(generateProgram(goodRecovery, CATALOG, { now: NOW }), CATALOG);
+
+    for (const muscle of TRAINED_MUSCLES) {
+      const baseSets = baselineVol.get(muscle) ?? 0;
+      const goodSets = goodVol.get(muscle) ?? 0;
+      if (baseSets === 0) continue;
+      expect(goodSets).toBeGreaterThan(baseSets);
+    }
+  });
+
+  it('omitting sleep/stress matches average/moderate baseline volume', () => {
+    const explicit = makeConfig({
+      experience: 'intermediate',
+      daysPerWeek: 4,
+      split: 'upper-lower',
+      minutesPerSession: 180,
+      sleep: 'average',
+      stress: 'moderate',
+    });
+    const omitted = makeConfig({
+      experience: 'intermediate',
+      daysPerWeek: 4,
+      split: 'upper-lower',
+      minutesPerSession: 180,
+    });
+
+    const explicitVol = weeklyMuscleVolume(generateProgram(explicit, CATALOG, { now: NOW }), CATALOG);
+    const omittedVol = weeklyMuscleVolume(generateProgram(omitted, CATALOG, { now: NOW }), CATALOG);
+
+    for (const muscle of TRAINED_MUSCLES) {
+      expect(omittedVol.get(muscle) ?? 0).toBe(explicitVol.get(muscle) ?? 0);
+    }
+  });
 });
