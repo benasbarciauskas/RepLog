@@ -290,6 +290,28 @@ export default function SettingsPage() {
               />
             </div>
 
+            <div className="space-y-2">
+              <label htmlFor="ai-vision-model" className="text-sm font-medium text-foreground">
+                AI vision model
+              </label>
+              <Input
+                id="ai-vision-model"
+                type="text"
+                placeholder="meta-llama/llama-3.2-11b-vision-instruct:free"
+                aria-label="OpenRouter vision model"
+                className="max-w-md"
+                value={settings.aiVisionModel ?? ''}
+                onChange={(e) =>
+                  save({
+                    aiVisionModel: e.target.value.trim() || DEFAULT_SETTINGS.aiVisionModel,
+                  })
+                }
+              />
+              <p className="text-xs text-muted-foreground">
+                Used for &apos;Read with AI&apos; on screenshots — must support images.
+              </p>
+            </div>
+
             <p className="text-sm text-muted-foreground">
               <a
                 href="https://openrouter.ai/keys"
