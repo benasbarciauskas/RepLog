@@ -44,6 +44,28 @@ export const MIN_SETS_PER_MUSCLE_SESSION = 2;
 /** Secondary muscles receive partial credit toward their weekly volume. */
 export const SECONDARY_MUSCLE_CREDIT = 0.5;
 
+// ---------------------------------------------------------------------------
+// Recovery inputs — sleep + stress nudge weekly volume targets.
+// ---------------------------------------------------------------------------
+
+/** Sleep quality score: poor −1, average 0, good +1. */
+const SLEEP_SCORE = { poor: -1, average: 0, good: 1 } as const;
+
+/** Stress level score: high −1, moderate 0, low +1. */
+const STRESS_SCORE = { high: -1, moderate: 0, low: 1 } as const;
+
+/** recoveryScore (−2..+2) → weekly volume multiplier. */
+const RECOVERY_MULTIPLIER_BY_SCORE: Record<number, number> = {
+  [-2]: 0.8,
+  [-1]: 0.9,
+  0: 1.0,
+  1: 1.05,
+  2: 1.1,
+};
+
+/** Floor so poor recovery never prescribes trivial volume. */
+export const MIN_WEEKLY_VOLUME_TARGET = 6;
+
 export const MAX_SETS_PER_EXERCISE = 5;
 export const MIN_SETS_PER_EXERCISE = 2;
 
@@ -132,6 +154,21 @@ export interface GenerateProgramOptions {
 
 function isCompound(def: ExerciseDef): boolean {
   return COMPOUND_PATTERNS.has(def.pattern);
+}
+
+function recoveryMultiplier(config: ProgramConfig): number {
+  const sleep = config.sleep ?? 'average';
+  const stress = config.stress ?? 'moderate';
+  const score = SLEEP_SCORE[sleep] + STRESS_SCORE[stress];
+  const clamped = Math.max(-2, Math.min(2, score));
+  return RECOVERY_MULTIPLIER_BY_SCORE[clamped] ?? 1.0;
+}
+
+/** Experience weekly target adjusted for sleep/stress recovery. */
+export function weeklyVolumeTarget(config: ProgramConfig): number {
+  const base = WEEKLY_VOLUME_BY_EXPERIENCE[config.experience];
+  const adjusted = Math.round(base * recoveryMultiplier(config));
+  return Math.max(MIN_WEEKLY_VOLUME_TARGET, adjusted);
 }
 
 function resolveSplit(config: ProgramConfig): ResolvedSplit {
@@ -590,7 +627,7 @@ export function generateProgram(
 ): Program {
   const now = opts.now ?? new Date().toISOString();
   const resolved = resolveSplit(config);
-  const weeklyTarget = WEEKLY_VOLUME_BY_EXPERIENCE[config.experience];
+  const weeklyTarget = weeklyVolumeTarget(config);
   const blueprints = buildDayBlueprints(resolved, config.daysPerWeek);
   const dayCounts = muscleDayCounts(blueprints);
   const catalogById = new Map(catalog.map((e) => [e.id, e]));
@@ -637,7 +674,7 @@ export function weeklyMuscleVolume(
   catalog: ExerciseDef[],
 ): Map<MuscleGroup, number> {
   const catalogById = new Map(catalog.map((e) => [e.id, e]));
-  const weeklyTarget = WEEKLY_VOLUME_BY_EXPERIENCE[program.config.experience];
+  const weeklyTarget = weeklyVolumeTarget(program.config);
   const resolved = resolveSplit(program.config);
   const blueprints = buildDayBlueprints(resolved, program.config.daysPerWeek);
   const dayCounts = muscleDayCounts(blueprints);

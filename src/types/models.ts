@@ -161,6 +161,8 @@ export interface Routine {
 export type ProgramGoal = 'hypertrophy' | 'strength';
 export type Experience = 'beginner' | 'intermediate' | 'advanced';
 export type SplitChoice = 'auto' | 'full-body' | 'push-pull-legs' | 'upper-lower';
+export type SleepQuality = 'poor' | 'average' | 'good';
+export type StressLevel = 'low' | 'moderate' | 'high';
 
 export interface ProgramConfig {
   goal: ProgramGoal;
@@ -168,6 +170,10 @@ export interface ProgramConfig {
   daysPerWeek: number;
   split: SplitChoice;
   minutesPerSession: number;
+  /** Optional — defaults to average when absent (backward-compatible). */
+  sleep?: SleepQuality;
+  /** Optional — defaults to moderate when absent (backward-compatible). */
+  stress?: StressLevel;
 }
 
 export interface ProgramDayExercise {
