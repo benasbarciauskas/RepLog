@@ -143,43 +143,47 @@ npm run lint    # eslint
 
 ---
 
-## E. Mobile app via Expo (coming, separate repo)
+## E. Native app via Expo (`mobile/`)
 
-A native iOS/Android RepLog is planned as a **separate Expo / React Native repo**
-that reuses this web app's parser, analytics, and coach logic (the framework-free
-`src/parser`, `src/analytics`, and `src/coach` modules are built to port cleanly).
+RepLog ships a native iOS/Android app built with **Expo + expo-router**, in the
+[`mobile/`](mobile/) folder. It reuses this web app's parser, analytics, and coach
+logic directly (via a `mobile/core` symlink to `src/`), stores data on-device with
+`expo-sqlite`, and keeps the same on-device, no-account, no-cost principle.
 
-When that repo lands, the workflow will look like this:
-
-### Create the app
-
-```bash
-npx create-expo-app replog-mobile
-cd replog-mobile
-```
-
-### Run it on a phone
+### Run it on your phone (Expo Go)
 
 ```bash
+cd mobile
+npm install        # first time only
 npx expo start
 ```
 
-This prints a **QR code**. Install **Expo Go** from the App Store / Play Store,
-then scan the QR code with your phone (Camera app on iOS, the Expo Go app on
-Android) to run RepLog live on the device, with hot reload as you edit.
+This prints a **QR code**. Install **Expo Go** from the App Store / Play Store, then
+scan the QR code (iOS Camera app, or the Expo Go app on Android) to run RepLog live
+on your device, with hot reload as you edit.
 
-### Build and submit a real binary (EAS)
+> The app reuses the shared core from `../src` through the `mobile/core` symlink, so
+> run it from inside a full clone of this repo — not a copy of `mobile/` on its own.
+
+### AI parse on mobile
+
+Same optional feature as the web app: add your own free **OpenRouter** key in
+**Settings → AI parsing** to turn messy notes into workouts. The key is stored only
+on the device and is excluded from exported backups.
+
+### Build & submit a real binary (EAS / expo.dev)
 
 ```bash
 npm install -g eas-cli
-eas login
-eas build --platform ios       # or: --platform android, or: --platform all
-eas submit --platform ios      # uploads the build to App Store Connect
+eas login                      # uses your free expo.dev account
+cd mobile
+eas build --platform ios       # or --platform android / all — builds in the cloud
+eas submit --platform ios      # uploads to App Store Connect
 ```
 
-`eas build` produces a real signed app binary in the cloud; `eas submit` ships it
-to the App Store / Play Store. The native app will keep the same on-device,
-no-account, no-cost principle as the web version.
+`eas build` produces a signed binary on **expo.dev**; `eas submit` ships it to the
+store. You can also push instant JS-only updates with `eas update`. The native app
+keeps the same on-device, no-account, no-cost principle as the web version.
 
 ---
 
