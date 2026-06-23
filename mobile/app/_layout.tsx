@@ -17,6 +17,17 @@ export default function RootLayout() {
       <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen
+          name="import"
+          options={{
+            presentation: 'card',
+            headerShown: true,
+            title: 'Import',
+            headerStyle: { backgroundColor: '#0c0d0f' },
+            headerTintColor: '#f4f5f6',
+            headerShadowVisible: false,
+          }}
+        />
       </Stack>
     </SafeAreaProvider>
   );

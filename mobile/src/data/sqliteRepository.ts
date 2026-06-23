@@ -21,7 +21,7 @@ const EXPORT_APP = 'RepLog';
 const EXPORT_VERSION = 1;
 
 /** Default logger preferences (kg, 20 kg bar, standard plate set, 2-min rest). */
-const DEFAULT_SETTINGS: AppSettings = {
+export const DEFAULT_SETTINGS: AppSettings = {
   barWeightKg: 20,
   availablePlatesKg: [25, 20, 15, 10, 5, 2.5, 1.25],
   defaultRestSeconds: 120,

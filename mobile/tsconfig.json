@@ -9,7 +9,9 @@
       "@/assets/*": ["./assets/*"],
       "@core/*": ["../src/*"],
       "dexie": ["./node_modules/dexie"],
-      "nanoid": ["./node_modules/nanoid"]
+      "nanoid": ["./node_modules/nanoid"],
+      "fuse.js": ["./node_modules/fuse.js"],
+      "chrono-node": ["./node_modules/chrono-node"]
     }
   },
   "include": [
@@ -21,9 +23,6 @@
     "css.d.ts"
   ],
   "exclude": [
-    "core/**",
-    "src/components/**",
-    "src/constants/**",
-    "src/hooks/**"
+    "core/**"
   ]
 }
