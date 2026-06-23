@@ -68,6 +68,14 @@ export default function ImportPage() {
       const { workouts, skipped, warnings } = ingestCorpus(trimmed);
 
       if (workouts.length === 0) {
+        if (trimmed.length > 0) {
+          setPasteText(trimmed);
+          setMode('paste');
+          toast.info(
+            "Couldn't auto-detect a workout. Here's the text we read — edit it or paste your note, then Parse.",
+          );
+          return false;
+        }
         toast.error('No workouts found', {
           description:
             skipped.length > 0
@@ -100,7 +108,7 @@ export default function ImportPage() {
       navigate('/review', { state });
       return true;
     },
-    [navigate],
+    [navigate, setPasteText, setMode],
   );
 
   // --- Screenshots → OCR each → corpus -------------------------------------
@@ -388,6 +396,10 @@ function ScreenshotMode({
           </span>
         </span>
       </button>
+
+      <p className="text-xs text-muted-foreground">
+        For many notes at once, pasting the text or using one screenshot per note is most reliable.
+      </p>
 
       <input
         ref={inputRef}
