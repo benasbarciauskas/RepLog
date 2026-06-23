@@ -61,7 +61,7 @@ describe('analyzeImbalances', () => {
   });
 
   it('caps a med-confidence rule below band at flag (never priority)', () => {
-    // row-bench is med, band [0.75, 0.90]. ratio 0.40 is far below min*0.92.
+    // row-bench is med, band [0.70, 0.90]. ratio 0.40 is far below min*0.92.
     const bests = [best('barbell-bench-press', 150), best('barbell-row', 60)];
     const f = analyzeImbalances(bests).find((x) => x.ruleId === 'row-bench')!;
     expect(f).toBeDefined();
@@ -94,6 +94,42 @@ describe('analyzeImbalances', () => {
     expect(f.message).toContain('75kg');
     expect(f.message).toContain('0.50');
     expect(f.message).toMatch(/0\.60/);
+  });
+
+  it('flags a weak weighted pull-up vs barbell row deficit (pullup-row)', () => {
+    const bests = [best('barbell-row', 100), best('weighted-pull-up', 50)];
+    const f = analyzeImbalances(bests).find((x) => x.ruleId === 'pullup-row')!;
+    expect(f).toBeDefined();
+    expect(f.severity).toBe('flag'); // 0.50 < 0.90*0.92, med-confidence caps at flag
+    expect(f.ratio).toBeCloseTo(0.5, 5);
+    expect(f.message).toMatch(/weighted pull-up/i);
+    expect(f.message).toMatch(/lats/i);
+    expect(f.muscles).toContain('lats');
+  });
+
+  it('marks an in-band weighted pull-up vs barbell row as ok (pullup-row)', () => {
+    const bests = [best('barbell-row', 100), best('weighted-pull-up', 100)];
+    const f = analyzeImbalances(bests).find((x) => x.ruleId === 'pullup-row')!;
+    expect(f).toBeDefined();
+    expect(f.severity).toBe('ok'); // 1.00 in [0.9, 1.1]
+  });
+
+  it('flags a weak Romanian deadlift vs back squat deficit (rdl-squat)', () => {
+    const bests = [best('back-squat', 150), best('romanian-deadlift', 90)];
+    const f = analyzeImbalances(bests).find((x) => x.ruleId === 'rdl-squat')!;
+    expect(f).toBeDefined();
+    expect(f.severity).toBe('flag'); // 0.60 < 0.80*0.92
+    expect(f.ratio).toBeCloseTo(0.6, 5);
+    expect(f.message).toMatch(/Romanian deadlift/i);
+    expect(f.message).toMatch(/hamstring/i);
+    expect(f.muscles).toContain('hamstrings');
+  });
+
+  it('marks an in-band Romanian deadlift vs back squat as ok (rdl-squat)', () => {
+    const bests = [best('back-squat', 150), best('romanian-deadlift', 127.5)];
+    const f = analyzeImbalances(bests).find((x) => x.ruleId === 'rdl-squat')!;
+    expect(f).toBeDefined();
+    expect(f.severity).toBe('ok'); // 0.85 in [0.8, 1.0]
   });
 
   it('orders findings priority -> flag -> ok', () => {

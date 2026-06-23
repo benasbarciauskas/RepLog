@@ -97,12 +97,12 @@ const AREA_GROUPS: { key: string; label: string; ruleIds: string[] }[] = [
   // Push: pressing strength balance (vertical press vs horizontal, upper chest).
   { key: 'push', label: 'Push', ruleIds: ['ohp-bench', 'incline-flat'] },
   // Pull: pulling strength relative to pressing.
-  { key: 'pull', label: 'Pull', ruleIds: ['row-bench', 'pullup-bench'] },
+  { key: 'pull', label: 'Pull', ruleIds: ['row-bench', 'pullup-bench', 'pullup-row'] },
   // Lower: squat/deadlift balance vs the rest.
   {
     key: 'lower',
     label: 'Lower body',
-    ruleIds: ['squat-bench', 'deadlift-squat', 'frontsquat-backsquat'],
+    ruleIds: ['squat-bench', 'deadlift-squat', 'frontsquat-backsquat', 'rdl-squat'],
   },
 ];
 
