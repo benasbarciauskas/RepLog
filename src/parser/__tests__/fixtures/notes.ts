@@ -33,3 +33,14 @@ RDL: 100x8, 100x8
 
 2 Sep 2024
 Marathon (42.2km - 6:16 pace)`;
+
+/** Smoke note from parser-dialects spec — messy freeform variants. */
+export const MESSY_DIALECT_NOTE = `mon 14/10 push day @ 88kg
+bench press 100x5 102.5x5 105x4
+ohp 60kg 5/5/4
+tri pushdown 25 x12 x12 x15
+
+wed legs
+squat 140 x5x5
+RDL 100kg x8 x8
+pullups 12/10/8`;

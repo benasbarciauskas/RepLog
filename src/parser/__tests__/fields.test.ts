@@ -22,6 +22,16 @@ describe('extractBodyweight', () => {
     expect(extractBodyweight('Benchpress 5x5: 105x 5, 5, 5')).toBeNull();
     expect(extractBodyweight('Monday - Chest and Back')).toBeNull();
   });
+
+  it('parses @-prefixed bodyweight forms', () => {
+    expect(extractBodyweight('mon 14/10 push day @ 88kg')).toBe(88);
+    expect(extractBodyweight('@88')).toBe(88);
+    expect(extractBodyweight('@ 90.5 kg')).toBe(90.5);
+  });
+
+  it('does not treat a set weight as @ bodyweight', () => {
+    expect(extractBodyweight('bench 105x5')).toBeNull();
+  });
 });
 
 describe('detectSplit', () => {
@@ -80,5 +90,42 @@ describe('extractDate', () => {
 
   it('returns null when there is no date', () => {
     expect(extractDate('Benchpress 5x5: 105x 5, 5, 5')).toBeNull();
+  });
+
+  it('parses DD/MM numeric dates (UK order) with explicit year at high confidence', () => {
+    expect(extractDate('14/10/24')).toMatchObject({
+      date: '2024-10-14',
+      confidence: 'high',
+    });
+    expect(extractDate('14-10-2024')).toMatchObject({
+      date: '2024-10-14',
+      confidence: 'high',
+    });
+  });
+
+  it('parses optional leading weekday + DD/MM', () => {
+    expect(extractDate('mon 14/10', undefined, 2024)).toMatchObject({
+      date: '2024-10-14',
+      confidence: 'low',
+    });
+    expect(extractDate('Wed 5/4', undefined, 2024)).toMatchObject({
+      date: '2024-04-05',
+      confidence: 'low',
+    });
+  });
+
+  it('uses yearHint then nowYear for yearless DD/MM', () => {
+    expect(extractDate('14/10', 2023)).toMatchObject({
+      date: '2023-10-14',
+      confidence: 'low',
+    });
+    expect(extractDate('14/10', undefined, 2025)).toMatchObject({
+      date: '2025-10-14',
+      confidence: 'low',
+    });
+  });
+
+  it('does not treat slash rep-lists mid-line as dates', () => {
+    expect(extractDate('ohp 60kg 5/5/4')).toBeNull();
   });
 });
