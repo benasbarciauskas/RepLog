@@ -59,16 +59,19 @@ function AnimatedRoutes() {
 export default function App() {
   return (
     <div className="min-h-dvh bg-background">
-      <Sidebar />
       <MobileTopBar />
 
-      {/* Content column: offset for the sidebar on desktop, padded for the
-          bottom tab bar on mobile. Capped width for comfortable line lengths. */}
-      <div className="md:pl-60">
-        <main className="mx-auto w-full max-w-5xl px-4 pb-24 pt-6 sm:px-6 md:pb-10 md:pt-10">
-          <Suspense fallback={<RouteFallback />}>
-            <AnimatedRoutes />
-          </Suspense>
+      {/* The whole shell (sidebar + content) is capped and centered, so on wide
+          screens it sits in the middle of the viewport with even margins — the
+          sidebar travels with the content instead of pinning to the far edge. */}
+      <div className="mx-auto flex w-full max-w-[1400px]">
+        <Sidebar />
+        <main className="min-w-0 flex-1">
+          <div className="mx-auto w-full max-w-5xl px-4 pb-24 pt-6 sm:px-6 md:pb-10 md:pt-10">
+            <Suspense fallback={<RouteFallback />}>
+              <AnimatedRoutes />
+            </Suspense>
+          </div>
         </main>
       </div>
 

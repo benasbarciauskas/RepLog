@@ -20,7 +20,7 @@ function Wordmark({ className }: { className?: string }) {
 /** Desktop left sidebar. Hidden below `md`. Shows the full nav (all routes). */
 export function Sidebar() {
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-border bg-surface/60 px-4 py-6 backdrop-blur-sm md:flex">
+    <aside className="sticky top-0 z-30 hidden h-dvh w-60 shrink-0 flex-col border-r border-border bg-surface/60 px-4 py-6 backdrop-blur-sm md:flex">
       <NavLink to="/" className="mb-8 px-2" aria-label="RepLog home">
         <Wordmark />
       </NavLink>

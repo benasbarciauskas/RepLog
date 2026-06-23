@@ -16,8 +16,6 @@ export interface SetRowProps {
   onPatch: (patch: Partial<ActiveSet>) => void;
   onToggleDone: () => void;
   onRemove: () => void;
-  /** Open the plate calculator for this set's weight. */
-  onOpenPlates: () => void;
 }
 
 /** Round a display value to at most 2dp without trailing zeros. */
@@ -48,7 +46,6 @@ export function SetRow({
   onPatch,
   onToggleDone,
   onRemove,
-  onOpenPlates,
 }: SetRowProps) {
   const prevLabel = previous
     ? `${displayNum(previous.weightKg, unit) || 'BW'}×${previous.reps}`
@@ -57,7 +54,7 @@ export function SetRow({
   return (
     <div
       className={cn(
-        'grid grid-cols-[2rem_3.5rem_1fr_1fr_2.75rem_2rem] items-center gap-1.5 rounded-lg px-1.5 py-1.5 transition-colors sm:gap-2',
+        'grid grid-cols-[1.75rem_3.25rem_minmax(0,1fr)_minmax(0,1fr)_3.5rem_3.75rem] items-center gap-1.5 rounded-lg px-1.5 py-1.5 transition-colors sm:gap-2',
         set.done && 'bg-highlight-muted',
       )}
     >
@@ -93,27 +90,17 @@ export function SetRow({
         {prevLabel}
       </button>
 
-      {/* Weight (tap label region opens plate calc) */}
-      <div className="relative">
-        <Input
-          inputMode="decimal"
-          type="number"
-          step="any"
-          aria-label="Weight"
-          placeholder={previous ? displayNum(previous.weightKg, unit) : '0'}
-          value={displayNum(set.weightKg, unit)}
-          onChange={(e) => onPatch({ weightKg: parseToKg(e.target.value, unit) })}
-          className="h-9 px-2 text-center tnum"
-        />
-        <button
-          type="button"
-          onClick={onOpenPlates}
-          aria-label="Plate calculator"
-          className="absolute -bottom-3.5 left-1/2 -translate-x-1/2 text-[10px] text-muted-foreground/70 hover:text-highlight"
-        >
-          plates
-        </button>
-      </div>
+      {/* Weight */}
+      <Input
+        inputMode="decimal"
+        type="number"
+        step="any"
+        aria-label="Weight"
+        placeholder={previous ? displayNum(previous.weightKg, unit) : '0'}
+        value={displayNum(set.weightKg, unit)}
+        onChange={(e) => onPatch({ weightKg: parseToKg(e.target.value, unit) })}
+        className="h-9 px-2 text-center tnum [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+      />
 
       {/* Reps */}
       <Input
@@ -126,7 +113,7 @@ export function SetRow({
         onChange={(e) =>
           onPatch({ reps: e.target.value === '' ? null : Math.max(0, Math.floor(Number(e.target.value))) })
         }
-        className="h-9 px-2 text-center tnum"
+        className="h-9 px-2 text-center tnum [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
       />
 
       {/* RPE (optional) */}
@@ -140,16 +127,26 @@ export function SetRow({
         placeholder="RPE"
         value={set.rpe ?? ''}
         onChange={(e) => onPatch({ rpe: e.target.value === '' ? null : Number(e.target.value) })}
-        className="h-9 px-1 text-center tnum text-xs"
+        className="h-9 px-1 text-center tnum text-xs [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
       />
 
       {/* Done + remove (remove appears on row hover/focus-within) */}
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end gap-1">
         <Button
           type="button"
           variant={set.done ? 'default' : 'outline'}
           size="icon-sm"
-          onClick={onToggleDone}
+          onClick={() => {
+            // Confirming a set with blank fields auto-fills last time's numbers
+            // (the placeholder values), so a same-as-last-time set is one tap.
+            if (!set.done) {
+              const patch: Partial<ActiveSet> = {};
+              if (set.weightKg == null && previous?.weightKg != null) patch.weightKg = previous.weightKg;
+              if (set.reps == null && previous?.reps != null) patch.reps = previous.reps;
+              if (Object.keys(patch).length > 0) onPatch(patch);
+            }
+            onToggleDone();
+          }}
           aria-label={set.done ? 'Mark set not done' : 'Mark set done'}
           aria-pressed={set.done}
           className={cn(
@@ -163,7 +160,7 @@ export function SetRow({
           type="button"
           onClick={onRemove}
           aria-label="Remove set"
-          className="ml-0.5 hidden text-muted-foreground hover:text-destructive group-hover/row:block"
+          className="hidden text-muted-foreground hover:text-destructive group-hover/row:block"
         >
           <X className="size-3.5" strokeWidth={2} />
         </button>
