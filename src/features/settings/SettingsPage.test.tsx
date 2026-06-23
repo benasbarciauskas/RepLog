@@ -72,6 +72,39 @@ describe('SettingsPage', () => {
     );
   });
 
+  it('persists rest timer alerts toggle', async () => {
+    await renderSettings();
+    fireEvent.click(screen.getByRole('tab', { name: /^off$/i }));
+    expect(saveSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ restAlerts: false }),
+    );
+  });
+
+  it('saves and applies a plate preset', async () => {
+    settingsMock.mockReturnValue({
+      ...DEFAULT_SETTINGS,
+      platePresets: [{ id: 'p1', name: 'Home', plates: [25, 20] }],
+    });
+    await renderSettings();
+    fireEvent.click(screen.getByRole('button', { name: /^apply$/i }));
+    expect(saveSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ availablePlatesKg: [25, 20] }),
+    );
+
+    saveSettings.mockClear();
+    fireEvent.change(screen.getByLabelText(/plate preset name/i), {
+      target: { value: 'Travel gym' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /save current plates/i }));
+    expect(saveSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        platePresets: expect.arrayContaining([
+          expect.objectContaining({ name: 'Travel gym' }),
+        ]),
+      }),
+    );
+  });
+
   it('reflects the BASE_URL channel — local build shows Stable link while beta is unpublished', async () => {
     // In the test environment import.meta.env.BASE_URL is '/', i.e. a local build.
     expect(detectChannel(import.meta.env.BASE_URL)).toBe('local');

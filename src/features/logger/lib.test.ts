@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addPlatePreset,
   adjustRestDeadline,
+  deletePlatePreset,
   formatElapsed,
   formatRestClock,
+  groupExercisesForRender,
   makeEmptySession,
   platesForWeight,
+  platesFromPreset,
   platesRemainder,
   previousSetsFor,
   restDeadlineFrom,
@@ -289,5 +293,42 @@ describe('workingSetNumber', () => {
     expect(workingSetNumber(sets, 2)).toBe(2);
     expect(workingSetNumber(sets, 3)).toBeNull(); // warm-up
     expect(workingSetNumber(sets, 4)).toBe(3);
+  });
+});
+
+describe('plate presets', () => {
+  it('adds a named preset with plates sorted descending', () => {
+    const next = addPlatePreset(undefined, '  Home gym  ', [5, 25, 10], 'p1');
+    expect(next).toEqual([{ id: 'p1', name: 'Home gym', plates: [25, 10, 5] }]);
+  });
+
+  it('ignores blank names', () => {
+    expect(addPlatePreset([], '   ', [25], 'p1')).toEqual([]);
+  });
+
+  it('deletes a preset by id', () => {
+    const presets = [
+      { id: 'a', name: 'A', plates: [25] },
+      { id: 'b', name: 'B', plates: [20] },
+    ];
+    expect(deletePlatePreset(presets, 'a')).toEqual([{ id: 'b', name: 'B', plates: [20] }]);
+  });
+
+  it('returns sorted plates when applying a preset', () => {
+    expect(platesFromPreset({ id: 'x', name: 'X', plates: [2.5, 25, 10] })).toEqual([25, 10, 2.5]);
+  });
+});
+
+describe('groupExercisesForRender', () => {
+  it('groups consecutive exercises sharing a supersetGroup', () => {
+    const exercises = [
+      { id: '1', exerciseId: 'a', rawName: 'A', unit: 'kg' as const, sets: [], supersetGroup: 'g1' },
+      { id: '2', exerciseId: 'b', rawName: 'B', unit: 'kg' as const, sets: [], supersetGroup: 'g1' },
+      { id: '3', exerciseId: 'c', rawName: 'C', unit: 'kg' as const, sets: [] },
+    ];
+    expect(groupExercisesForRender(exercises)).toEqual([
+      { supersetGroup: 'g1', exercises: [exercises[0], exercises[1]] },
+      { exercises: [exercises[2]] },
+    ]);
   });
 });

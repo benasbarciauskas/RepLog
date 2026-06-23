@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Download, ExternalLink, FileDown, Plus, Upload, X } from 'lucide-react';
+import { newId } from '@/lib/id';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,8 @@ import { DEFAULT_SETTINGS, repository } from '@/data/repository';
 import { workoutsToCsv } from '@/data/csv';
 import { formatWeight } from '@/lib/units';
 import type { AppSettings, Unit } from '@/types/models';
+import { addPlatePreset, deletePlatePreset, platesFromPreset } from '@/features/logger/lib';
+import { ensureNotificationPermission, defaultRestAlertDeps } from '@/features/logger/restAlerts';
 import { BETA_AVAILABLE, CHANNEL_URLS, type Channel, detectChannel } from './channel';
 
 // --- Plate presets -----------------------------------------------------------
@@ -28,6 +31,7 @@ export default function SettingsPage() {
 
   // Local draft for the "add a plate" input.
   const [newPlate, setNewPlate] = useState('');
+  const [presetName, setPresetName] = useState('');
   const [exporting, setExporting] = useState(false);
   const [exportingCsv, setExportingCsv] = useState(false);
 
@@ -49,6 +53,20 @@ export default function SettingsPage() {
 
   function removePlate(plate: number) {
     save({ availablePlatesKg: settings.availablePlatesKg.filter((p) => p !== plate) });
+  }
+
+  function savePreset() {
+    const trimmed = presetName.trim();
+    if (!trimmed || settings.availablePlatesKg.length === 0) return;
+    save({
+      platePresets: addPlatePreset(
+        settings.platePresets,
+        trimmed,
+        settings.availablePlatesKg,
+        newId(),
+      ),
+    });
+    setPresetName('');
   }
 
   async function handleExport() {
@@ -131,6 +149,28 @@ export default function SettingsPage() {
             ]}
             value={settings.unit}
             onChange={(unit: Unit) => save({ unit })}
+          />
+        </SettingsSection>
+
+        {/* Rest timer alerts */}
+        <SettingsSection
+          title="Rest timer alerts"
+          description="Notification, vibration, and a short beep when rest reaches zero — even if the tab is in the background."
+        >
+          <SegmentedControl
+            ariaLabel="Rest timer alerts"
+            options={[
+              { value: 'on', label: 'On' },
+              { value: 'off', label: 'Off' },
+            ]}
+            value={settings.restAlerts !== false ? 'on' : 'off'}
+            onChange={(v: string) => {
+              const enabled = v === 'on';
+              if (enabled) {
+                void ensureNotificationPermission(defaultRestAlertDeps());
+              }
+              save({ restAlerts: enabled });
+            }}
           />
         </SettingsSection>
 
@@ -261,6 +301,78 @@ export default function SettingsPage() {
                   Use {preset.label}
                 </Button>
               ))}
+            </div>
+
+            {/* User-saved plate presets */}
+            <div className="space-y-3 border-t border-border pt-4">
+              <p className="text-sm font-medium text-foreground">Saved presets</p>
+              {(settings.platePresets ?? []).length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Save your current plate list as a named preset for quick switching.
+                </p>
+              ) : (
+                <ul className="space-y-2">
+                  {(settings.platePresets ?? []).map((preset) => (
+                    <li
+                      key={preset.id}
+                      className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2"
+                    >
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+                        {preset.name}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {preset.plates.length} plates
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => save({ availablePlatesKg: platesFromPreset(preset) })}
+                      >
+                        Apply
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          save({
+                            platePresets: deletePlatePreset(settings.platePresets, preset.id),
+                          })
+                        }
+                        aria-label={`Delete preset ${preset.name}`}
+                      >
+                        <X className="size-4" strokeWidth={2} />
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  type="text"
+                  placeholder="Preset name"
+                  aria-label="Plate preset name"
+                  className="w-44"
+                  value={presetName}
+                  onChange={(e) => setPresetName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      savePreset();
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={savePreset}
+                  disabled={settings.availablePlatesKg.length === 0}
+                >
+                  Save current plates
+                </Button>
+              </div>
             </div>
           </div>
         </SettingsSection>

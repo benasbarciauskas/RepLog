@@ -119,6 +119,11 @@ describe('LoggerPage — active workout flow', () => {
     fireEvent.click(screen.getByRole('button', { name: /add set/i }));
     await waitFor(() => expect(screen.getAllByLabelText('Weight')).toHaveLength(2));
 
+    // Add an exercise note.
+    fireEvent.click(screen.getByRole('button', { name: /add note/i }));
+    const note = await screen.findByLabelText(/note for barbell bench press/i);
+    fireEvent.change(note, { target: { value: 'Pause at chest' } });
+
     // Mark the first set done.
     const doneButtons = screen.getAllByRole('button', { name: /mark set done/i });
     fireEvent.click(doneButtons[0]);

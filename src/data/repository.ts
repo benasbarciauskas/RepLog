@@ -19,6 +19,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   availablePlatesKg: [25, 20, 15, 10, 5, 2.5, 1.25],
   defaultRestSeconds: 120,
   unit: 'kg',
+  restAlerts: true,
   aiModel: 'meta-llama/llama-3.3-70b-instruct:free',
   // Free vision-capable model on OpenRouter
   aiVisionModel: 'meta-llama/llama-3.2-11b-vision-instruct:free',
@@ -38,6 +39,8 @@ export function stripSettingsKey(stored: AppSettings & { id: string }): AppSetti
     availablePlatesKg: stored.availablePlatesKg,
     defaultRestSeconds: stored.defaultRestSeconds,
     unit: stored.unit,
+    ...(stored.restAlerts !== undefined ? { restAlerts: stored.restAlerts } : {}),
+    ...(stored.platePresets !== undefined ? { platePresets: stored.platePresets } : {}),
     ...(stored.aiApiKey !== undefined ? { aiApiKey: stored.aiApiKey } : {}),
     ...(stored.aiModel !== undefined ? { aiModel: stored.aiModel } : {}),
     ...(stored.aiVisionModel !== undefined ? { aiVisionModel: stored.aiVisionModel } : {}),

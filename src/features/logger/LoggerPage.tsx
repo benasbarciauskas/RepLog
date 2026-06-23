@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { cn } from '@/lib/utils';
 import { Link, useNavigate } from 'react-router-dom';
 import { useReducedMotion } from 'motion/react';
 import {
@@ -22,10 +23,12 @@ import { useNowTick } from './useRestTimer';
 import {
   adjustRestDeadline,
   formatElapsed,
+  groupExercisesForRender,
   makeEmptySession,
   routineFromSession,
   sessionFromRoutine,
 } from './lib';
+import { defaultRestAlertDeps, triggerRestTimerAlert } from './restAlerts';
 import { ExerciseCard } from './ExerciseCard';
 import { ExerciseSearchDialog, type ExercisePick } from './ExerciseSearchDialog';
 import { PlateCalculatorDialog } from './PlateCalculatorDialog';
@@ -214,10 +217,14 @@ function ActiveWorkout({ logger }: { logger: ReturnType<typeof useLogger> }) {
   };
 
   const restComplete = () => {
-    // Gentle, reduced-motion-safe cue; clear the timer once acknowledged.
-    toast('Rest complete', { icon: '⏱', duration: 2500 });
+    void triggerRestTimerAlert(settings.restAlerts, defaultRestAlertDeps());
+    if (!reduce) {
+      toast('Rest complete', { icon: '⏱', duration: 2500 });
+    }
     logger.clearRest();
   };
+
+  const exerciseGroups = groupExercisesForRender(session.exercises);
 
   return (
     <div className="space-y-5">
@@ -261,23 +268,48 @@ function ActiveWorkout({ logger }: { logger: ReturnType<typeof useLogger> }) {
         />
       ) : (
         <div className="space-y-4">
-          {session.exercises.map((ex, i) => (
-            <ExerciseCard
-              key={ex.id}
-              exercise={ex}
-              index={i}
-              count={session.exercises.length}
-              unit={settings.unit}
-              settings={settings}
-              workouts={workouts}
-              onPatchSet={(setId, patch) => logger.patchSet(ex.id, setId, patch)}
-              onToggleDone={(setId, rest) => logger.toggleDone(ex.id, setId, rest)}
-              onAddSet={() => logger.addSet(ex.id)}
-              onRemoveSet={(setId) => logger.removeSet(ex.id, setId)}
-              onRemoveExercise={() => logger.removeExercise(ex.id)}
-              onMove={(dir) => logger.moveExercise(ex.id, dir)}
-              onOpenPlates={openPlates}
-            />
+          {exerciseGroups.map((group) => (
+            <div
+              key={group.supersetGroup ?? group.exercises[0].id}
+              className={cn(
+                group.supersetGroup &&
+                  'space-y-2 rounded-xl border border-highlight/30 bg-highlight-muted/20 pl-3 pr-1 pt-2',
+              )}
+            >
+              {group.supersetGroup ? (
+                <p className="px-1 text-[10px] font-semibold uppercase tracking-wider text-highlight">
+                  Superset
+                </p>
+              ) : null}
+              {group.exercises.map((ex) => {
+                const i = session.exercises.findIndex((e) => e.id === ex.id);
+                return (
+                  <ExerciseCard
+                    key={ex.id}
+                    exercise={ex}
+                    index={i}
+                    count={session.exercises.length}
+                    unit={settings.unit}
+                    settings={settings}
+                    workouts={workouts}
+                    inSuperset={Boolean(group.supersetGroup)}
+                    onPatchSet={(setId, patch) => logger.patchSet(ex.id, setId, patch)}
+                    onPatchExercise={(patch) => logger.patchExercise(ex.id, patch)}
+                    onToggleDone={(setId, rest) => logger.toggleDone(ex.id, setId, rest)}
+                    onAddSet={() => logger.addSet(ex.id)}
+                    onRemoveSet={(setId) => logger.removeSet(ex.id, setId)}
+                    onRemoveExercise={() => logger.removeExercise(ex.id)}
+                    onMove={(dir) => logger.moveExercise(ex.id, dir)}
+                    onOpenPlates={openPlates}
+                    onSupersetWithNext={
+                      i < session.exercises.length - 1 && !ex.supersetGroup
+                        ? () => logger.supersetWithNext(ex.id)
+                        : undefined
+                    }
+                  />
+                );
+              })}
+            </div>
           ))}
         </div>
       )}
@@ -305,7 +337,7 @@ function ActiveWorkout({ logger }: { logger: ReturnType<typeof useLogger> }) {
         deadlineMs={session.restDeadlineMs ?? null}
         onAdjust={restAdjust}
         onSkip={logger.clearRest}
-        onComplete={reduce ? logger.clearRest : restComplete}
+        onComplete={restComplete}
       />
 
       {/* Dialogs */}
