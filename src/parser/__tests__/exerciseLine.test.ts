@@ -166,4 +166,112 @@ describe('parseExerciseLine', () => {
       { weightKg: 100, reps: 8, raw: 'x8' },
     ]);
   });
+  it('expands sets x reps @ weight schemes to identical sets', () => {
+    const ex = parseExerciseLine('Squat: 3x8 @ 100kg', cat)[0];
+    expect(ex.sets).toHaveLength(3);
+    expect(ex.sets.every((s) => s.weightKg === 100 && s.reps === 8)).toBe(true);
+  });
+
+  it('expands spaced scheme "3 x 8 @ 100"', () => {
+    const ex = parseExerciseLine('Bench: 3 x 8 @ 100', cat)[0];
+    expect(ex.sets).toHaveLength(3);
+    expect(ex.sets.every((s) => s.weightKg === 100 && s.reps === 8)).toBe(true);
+  });
+
+  it('expands a sets x reps @ weight scheme written as 5x5 @ 100', () => {
+    const ex = parseExerciseLine('Bench: 5x5 @ 100', cat)[0];
+    expect(ex.sets).toHaveLength(5);
+    expect(ex.sets.every((s) => s.weightKg === 100 && s.reps === 5)).toBe(true);
+  });
+
+  it('parses "weight for reps" notation', () => {
+    const ex = parseExerciseLine('Deadlift: 100kg for 8, 100 for 8 reps', cat)[0];
+    expect(ex.sets).toEqual([
+      { weightKg: 100, reps: 8, raw: '100kg for 8' },
+      { weightKg: 100, reps: 8, raw: '100 for 8 reps' },
+    ]);
+  });
+
+  it('parses a single "weight for reps" set (100 for 5)', () => {
+    const ex = parseExerciseLine('Bench: 100 for 5', cat)[0];
+    expect(ex.sets).toEqual([{ weightKg: 100, reps: 5, raw: '100 for 5' }]);
+  });
+
+  it('parses reps-first notation', () => {
+    const ex = parseExerciseLine('OHP: 8 reps x 100kg, 8 @ 100kg', cat)[0];
+    expect(ex.sets).toEqual([
+      { weightKg: 100, reps: 8, raw: '8 reps x 100kg' },
+      { weightKg: 100, reps: 8, raw: '8 @ 100kg' },
+    ]);
+  });
+
+  it('parses reps-first "5 reps @ 100"', () => {
+    const ex = parseExerciseLine('Bench: 5 reps @ 100', cat)[0];
+    expect(ex.sets).toEqual([{ weightKg: 100, reps: 5, raw: '5 reps @ 100' }]);
+  });
+
+  it('uses the top of a rep range (100x8-10 -> reps 10)', () => {
+    const ex = parseExerciseLine('Bench: 100x8-10', cat)[0];
+    expect(ex.sets[0]).toMatchObject({ weightKg: 100, reps: 10 });
+  });
+
+  it('expands slash drop sets (100/90/80 x 5)', () => {
+    const ex = parseExerciseLine('Squat: 100/90/80 x 5', cat)[0];
+    expect(ex.sets.map((s) => s.weightKg)).toEqual([100, 90, 80]);
+    expect(ex.sets.every((s) => s.reps === 5)).toBe(true);
+  });
+
+  it('expands comma drop sets with shared reps (100,90,80 x 5)', () => {
+    const ex = parseExerciseLine('Squat: 100,90,80 x 5', cat)[0];
+    expect(ex.sets.map((s) => s.weightKg)).toEqual([100, 90, 80]);
+    expect(ex.sets.every((s) => s.reps === 5)).toBe(true);
+  });
+
+  it('parses comma-separated drop weights after a set context', () => {
+    const ex = parseExerciseLine('Bench: 100x5, 90, 80', cat)[0];
+    expect(ex.sets.map((s) => [s.weightKg, s.reps])).toEqual([
+      [100, 5],
+      [90, 5],
+      [80, 5],
+    ]);
+  });
+
+  it('parses AMRAP with null reps', () => {
+    const ex = parseExerciseLine('Bench: 100x amrap, 100 x AMRAP', cat)[0];
+    expect(ex.sets[0]).toMatchObject({ weightKg: 100, reps: null, raw: '100x amrap' });
+    expect(ex.sets[1]).toMatchObject({ weightKg: 100, reps: null, raw: '100 x AMRAP' });
+  });
+
+  it('parses AMRAP shorthand 100xF with null reps', () => {
+    const ex = parseExerciseLine('Bench: 100xF', cat)[0];
+    expect(ex.sets[0]).toMatchObject({ weightKg: 100, reps: null });
+  });
+
+  it('parses inline added-weight bodyweight moves', () => {
+    const pull = parseExerciseLine('pull ups +10kg x 8', cat)[0];
+    expect(pull.exerciseId).toBe('weighted-pull-up');
+    expect(pull.sets[0]).toMatchObject({ weightKg: 10, reps: 8 });
+
+    const dips = parseExerciseLine('dips bw+20 x 6', cat)[0];
+    expect(dips.exerciseId).toBe('dips');
+    expect(dips.sets[0]).toMatchObject({ weightKg: 20, reps: 6 });
+  });
+
+  it('captures trailing RPE without breaking set parse', () => {
+    const ex = parseExerciseLine('Squat: 100x5 @8, 100x5 @RPE8', cat)[0];
+    expect(ex.sets[0]).toMatchObject({ weightKg: 100, reps: 5, rpe: 8 });
+    expect(ex.sets[1]).toMatchObject({ weightKg: 100, reps: 5, rpe: 8 });
+  });
+
+  it('converts lb/lbs to kg', () => {
+    const ex = parseExerciseLine('Bench: 225lb x 5', cat)[0];
+    expect(ex.sets[0].weightKg).toBeCloseTo(102.06, 1);
+    expect(ex.sets[0].reps).toBe(5);
+  });
+
+  it('converts a spaced lb weight to kg (225 lb x 5)', () => {
+    const ex = parseExerciseLine('Bench: 225 lb x 5', cat)[0];
+    expect(ex.sets[0].weightKg).toBeCloseTo(102.06, 1);
+    expect(ex.sets[0].reps).toBe(5);
+  });
 });
