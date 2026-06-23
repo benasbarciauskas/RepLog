@@ -6,6 +6,8 @@ import type { CoachFinding, ExerciseBest, Workout } from '@/types/models';
 const workoutsMock = vi.fn<() => Workout[]>(() => []);
 const findingsMock = vi.fn<() => CoachFinding[]>(() => []);
 const bestsMock = vi.fn<() => ExerciseBest[]>(() => []);
+const customExercisesMock = vi.fn(() => []);
+const activeProgramMock = vi.fn(() => undefined);
 
 // muscleCoverage + balanceScore are intentionally NOT mocked — the page calls
 // the real engines.
@@ -13,6 +15,8 @@ vi.mock('@/data/hooks', () => ({
   useWorkouts: () => workoutsMock(),
   useCoachFindings: () => findingsMock(),
   useBests: () => bestsMock(),
+  useCustomExercises: () => customExercisesMock(),
+  useActiveProgram: () => activeProgramMock(),
 }));
 
 async function renderCoach() {
@@ -145,5 +149,35 @@ describe('CoachPage', { timeout: 20000 }, () => {
     expect(screen.getByRole('heading', { name: /never trained/i })).toBeInTheDocument();
     // Quads were never worked (only bench logged).
     expect(screen.getByText('Quads')).toBeInTheDocument();
+  });
+
+  it('renders weekly volume rows and a recommendation for undertrained muscles', async () => {
+    const recentDate = new Date().toISOString().slice(0, 10);
+    const volumeWorkout: Workout = {
+      ...benchWorkout,
+      date: recentDate,
+      createdAt: `${recentDate}T10:00:00.000Z`,
+      exercises: [
+        {
+          exerciseId: 'barbell-bench-press',
+          rawName: 'Bench',
+          unit: 'kg',
+          sets: [{ weightKg: 100, reps: 5, raw: '100x5' }],
+        },
+      ],
+    };
+
+    workoutsMock.mockReturnValue([volumeWorkout]);
+    bestsMock.mockReturnValue(scorableBests);
+    findingsMock.mockReturnValue([]);
+
+    await renderCoach();
+
+    expect(screen.getByRole('heading', { name: /weekly volume/i })).toBeInTheDocument();
+    expect(screen.getByText(/working sets per muscle over the last 7 days/i)).toBeInTheDocument();
+    expect(screen.getByText(/add \d+ sets of quads this week/i)).toBeInTheDocument();
+    const volumeSection = screen.getByRole('heading', { name: /weekly volume/i }).closest('section');
+    expect(volumeSection).not.toBeNull();
+    expect(volumeSection!.querySelectorAll('li').length).toBeGreaterThan(0);
   });
 });

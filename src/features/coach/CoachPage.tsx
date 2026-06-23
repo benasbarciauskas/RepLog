@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { RingGauge, type GaugeTone } from '@/components/charts/RingGauge';
 import { cn } from '@/lib/utils';
 import { useBests, useCoachFindings, useWorkouts } from '@/data/hooks';
+import { VolumeInsights } from './VolumeInsights';
 import { muscleCoverage } from '@/coach/analyze';
 import {
   balanceScore,
@@ -285,6 +286,8 @@ export default function CoachPage() {
             </div>
           </section>
         ) : null}
+
+        <VolumeInsights />
       </div>
     </div>
   );
