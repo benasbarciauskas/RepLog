@@ -179,10 +179,14 @@ export interface ProgramDayExercise {
   restSeconds: number;
 }
 
+export type ProgramDayIntensity = 'heavy' | 'moderate' | 'light';
+
 export interface ProgramDay {
   name: string;
   splitCanonical: SplitCanonical;
   exercises: ProgramDayExercise[];
+  /** Set when DUP shifts intensity for repeated day-types within the week. */
+  intensity?: ProgramDayIntensity;
 }
 
 export interface Program {
