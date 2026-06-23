@@ -47,14 +47,27 @@ export function parseNotes(
       const line = rawLine.trim();
       if (!line) continue;
 
+      // Parse the line as an exercise up front so the date guard below can use
+      // the authoritative result: a line that yields an exercise is a SET line,
+      // never a date header. Only attempt it on lines that look like set data
+      // (matches the original guard) so headers/date lines stay cheap.
+      const isSetLine = looksLikeSetLine(line);
+      const parsed =
+        isSetLine && !isSessionHeader(line)
+          ? parseExerciseLine(line, catalog)
+          : [];
+
       // Bodyweight (first hit on any line wins).
       if (bodyweightKg === null) {
         const bw = extractBodyweight(line);
         if (bw !== null) bodyweightKg = bw;
       }
 
-      // Date (first explicit date in the chunk wins).
-      if (date === null) {
+      // Date (first explicit date in the chunk wins). Never run date extraction
+      // on a line that parses as an exercise — a numeric rep-list like
+      // "pullups 12/10" must not be mis-read as a DD/MM date (spec §3: dates are
+      // matched only at header/line-start, never mid-line on an exercise line).
+      if (date === null && parsed.length === 0) {
         const d = extractDate(line, yearHint, nowYear);
         if (d) {
           date = d.date;
@@ -63,7 +76,7 @@ export function parseNotes(
       }
 
       // Split (first matching header wins, but skip lines that are set data).
-      if (splitCanonical === 'unknown' && !looksLikeSetLine(line)) {
+      if (splitCanonical === 'unknown' && !isSetLine) {
         const s = detectSplit(line);
         if (s.canonical !== 'unknown') {
           splitCanonical = s.canonical;
@@ -71,10 +84,7 @@ export function parseNotes(
         }
       }
 
-      // Exercise line (skip session headers and bodyweight-only lines).
-      if (isSessionHeader(line) || !looksLikeSetLine(line)) continue;
-
-      const parsed = parseExerciseLine(line, catalog);
+      // Push parsed exercises (skips session headers / non-set lines via `parsed`).
       if (parsed.length > 0) {
         exercises.push(...parsed);
         collectInlineRemainders(line, warnings);
@@ -104,8 +114,21 @@ function findYearHint(text: string): number | undefined {
   return m ? Number.parseInt(m[0], 10) : undefined;
 }
 
+// A weekday-led numeric date header ("mon 14/10", "Wed 5/4"): NOT a set line.
+const WEEKDAY_LED_NUMERIC_DATE =
+  /^\s*(?:mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?),?\s+\d{1,2}[/.-]\d{1,2}(?:[/.-]\d{1,4})?\b/i;
+
 /** Heuristic: does this line carry set data (weights/reps)? */
 function looksLikeSetLine(line: string): boolean {
+  // A bodyweight slash rep-list after an exercise name — including the two-value
+  // form "pullups 12/10" — is set data, not a DD/MM date. Guard against
+  // weekday-led numeric date headers ("mon 14/10") which must stay header lines.
+  if (
+    /[a-z].*\b\d+\/\d+\b/i.test(line) &&
+    !WEEKDAY_LED_NUMERIC_DATE.test(line)
+  ) {
+    return true;
+  }
   return (
     /\d+\s*(?:kgs?)?\s*[x×]\s*\d+/i.test(line) ||
     /:\s*\d[\d.]*\s*(?:kgs?)?\s*[x×,]/i.test(line) ||

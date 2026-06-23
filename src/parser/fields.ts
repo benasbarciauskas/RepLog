@@ -150,13 +150,20 @@ export function extractDate(
   yearHint?: number,
   nowYear?: number,
 ): { date: string; confidence: 'high' | 'low' } | null {
-  // 1. Try explicit DD/MM path BEFORE chrono so UK order wins.
+  // 1. Try explicit DD/MM path BEFORE chrono so UK order wins. parseNumericDDMM
+  //    only matches a numeric slash date at line-start (after an optional
+  //    weekday), so a mid-line "12/10" inside an exercise line never matches it.
   const numericResult = parseNumericDDMM(text, yearHint, nowYear);
   if (numericResult) return numericResult;
 
-  // 2. Fall back to chrono for named-month dates ("26 Aug 2024", "19 June", "Nov 13").
+  // 2. Fall back to chrono for NAMED-MONTH dates ("26 Aug 2024", "19 June",
+  //    "Nov 13"). Strip any bare numeric slash/dash date tokens first: a mid-line
+  //    "12/10" (e.g. the rep-list in "pullups 12/10") is NOT a date — only the
+  //    line-start numeric form handled above counts (spec §3). Without this,
+  //    chrono would greedily read "12/10" as 10 Dec and steal the date.
+  const forChrono = text.replace(/\b\d{1,4}[/.-]\d{1,2}(?:[/.-]\d{1,4})?\b/g, ' ');
   const ref = yearHint ? new Date(yearHint, 0, 1) : undefined;
-  const results = chrono.parse(text, ref, { forwardDate: false });
+  const results = chrono.parse(forChrono, ref, { forwardDate: false });
   if (results.length === 0) return null;
 
   const result = results[0];

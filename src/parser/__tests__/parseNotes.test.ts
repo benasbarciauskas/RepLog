@@ -122,3 +122,36 @@ describe('parseNotes — messy dialect smoke note', () => {
     expect(result.warnings).toEqual([]);
   });
 });
+
+
+describe('parseNotes — mid-line slash rep-list is not a date (regression)', () => {
+  // Integration repro: in a FULL note a bodyweight line "pullups 12/10" was
+  // mis-consumed as the workout DATE (2026-12-10) and the exercise was dropped,
+  // because date extraction ran on the exercise line and chrono read "12/10" as
+  // a date. The session is undated; the pullups must survive with 2 sets.
+  const note = `wed legs\npullups 12/10\nsquat 140 x5x5`;
+  const result = parseNotes(note, cat, 2026);
+  const legs = result.workouts[result.workouts.length - 1];
+
+  it('does NOT date the session from the mid-line "12/10" rep-list', () => {
+    expect(legs.date).not.toBe('2026-12-10');
+    expect(legs.date).toBe('');
+  });
+
+  it('keeps the bodyweight pullups exercise with 2 sets (reps 12, 10)', () => {
+    const pullups = legs.exercises.find((e) => e.exerciseId === 'pull-up');
+    expect(pullups).toBeTruthy();
+    expect(pullups!.sets.map((set) => set.reps)).toEqual([12, 10]);
+    expect(pullups!.sets.every((set) => set.weightKg === null)).toBe(true);
+  });
+
+  it('also keeps the squat exercise (both exercises present, none dropped)', () => {
+    const ids = legs.exercises.map((e) => e.exerciseId);
+    expect(ids).toContain('pull-up');
+    expect(ids).toContain('back-squat');
+  });
+
+  it('produces no false inline-remainder warnings', () => {
+    expect(result.warnings).toEqual([]);
+  });
+});
