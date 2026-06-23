@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { BUILTIN_EXERCISES, createCatalog } from '@/parser/catalog';
+import { buildCustomExerciseDef } from '@/features/logger/customExercise';
 import {
   volumeRecommendations,
   volumeReport,
   weeklyVolumeByMuscle,
 } from '@/program/volume';
-import type { Workout, WorkoutExercise } from '@/types/models';
+import type { ExerciseDef, Workout, WorkoutExercise } from '@/types/models';
 
 const CATALOG = createCatalog().all();
 const NOW = new Date('2024-06-19T12:00:00.000Z');
@@ -97,6 +98,29 @@ describe('weeklyVolumeByMuscle', () => {
     for (const muscle of cardioDef!.primaryMuscles) {
       expect(totals.get(muscle) ?? 0).toBe(0);
     }
+  });
+
+  it('counts custom exercises toward their tagged primary muscles', () => {
+    const customDef: ExerciseDef = buildCustomExerciseDef({
+      canonicalName: 'Sissy Squat',
+      primaryMuscles: ['quads'],
+      secondaryMuscles: ['glutes'],
+    });
+    const catalog = [...CATALOG, customDef];
+
+    const workouts = [
+      workout('2024-06-19', [
+        exercise(customDef.id, [
+          { weightKg: 0, reps: 12, raw: '12' },
+          { weightKg: 0, reps: 12, raw: '12' },
+          { weightKg: 0, reps: 12, raw: '12' },
+        ]),
+      ]),
+    ];
+
+    const totals = weeklyVolumeByMuscle(workouts, catalog, 7, NOW);
+    expect(totals.get('quads')).toBe(3);
+    expect(totals.get('glutes')).toBe(1.5);
   });
 });
 

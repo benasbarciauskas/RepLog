@@ -1,20 +1,31 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Plus, Search } from 'lucide-react';
+import { ArrowLeft, Plus, Search } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { MuscleMultiSelect } from '@/components/MuscleMultiSelect';
 import { createCatalog } from '@/parser/catalog';
 import { db } from '@/data/db';
 import { repository } from '@/data/repository';
 import { cn } from '@/lib/utils';
-import type { ExerciseDef } from '@/types/models';
+import type { ExerciseCategory, ExerciseDef, MovementPattern, MuscleGroup } from '@/types/models';
+import {
+  CUSTOM_CATEGORY_OPTIONS,
+  CUSTOM_PATTERN_OPTIONS,
+  buildCustomExerciseDef,
+  humanToken,
+  inferCategoryFromMuscles,
+} from './customExercise';
 
 export interface ExercisePick {
   exerciseId: string;
@@ -41,6 +52,140 @@ function humanCategory(c: ExerciseDef['category']): string {
   return c.charAt(0).toUpperCase() + c.slice(1);
 }
 
+interface CustomExerciseCreateFormProps {
+  name: string;
+  onBack: () => void;
+  onCreated: (pick: ExercisePick) => void;
+}
+
+/**
+ * Second step after "Add …" — tag muscles (required), optional category/pattern/
+ * secondary. Category defaults from primary muscles; pattern defaults to isolation.
+ */
+function CustomExerciseCreateForm({ name, onBack, onCreated }: CustomExerciseCreateFormProps) {
+  const [primaryMuscles, setPrimaryMuscles] = useState<MuscleGroup[]>([]);
+  const [secondaryMuscles, setSecondaryMuscles] = useState<MuscleGroup[]>([]);
+  const [category, setCategory] = useState<ExerciseCategory>('push');
+  const [pattern, setPattern] = useState<MovementPattern>('isolation');
+  const [categoryTouched, setCategoryTouched] = useState(false);
+
+  useEffect(() => {
+    if (!categoryTouched && primaryMuscles.length > 0) {
+      setCategory(inferCategoryFromMuscles(primaryMuscles));
+    }
+  }, [primaryMuscles, categoryTouched]);
+
+  useEffect(() => {
+    setSecondaryMuscles((prev) => prev.filter((m) => !primaryMuscles.includes(m)));
+  }, [primaryMuscles]);
+
+  async function submit() {
+    if (primaryMuscles.length === 0) return;
+    const def = buildCustomExerciseDef({
+      canonicalName: name,
+      category,
+      pattern,
+      primaryMuscles,
+      secondaryMuscles,
+    });
+    await repository.addCustomExercise(def);
+    onCreated({ exerciseId: def.id, rawName: def.canonicalName });
+  }
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="space-y-4 overflow-y-auto px-6 pb-2">
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
+          Back to search
+        </button>
+
+        <div>
+          <p className="text-sm font-medium text-foreground">{name}</p>
+          <p className="text-xs text-muted-foreground">Tag muscles so volume insights count this lift.</p>
+        </div>
+
+        <MuscleMultiSelect
+          label="Primary muscles"
+          aria-label="Primary muscles"
+          value={primaryMuscles}
+          onChange={setPrimaryMuscles}
+        />
+
+        <details className="group rounded-lg border border-border bg-surface/30 px-3 py-2">
+          <summary className="cursor-pointer text-xs font-medium text-muted-foreground marker:content-none [&::-webkit-details-marker]:hidden">
+            <span className="group-open:hidden">More options (category, pattern, secondary)</span>
+            <span className="hidden group-open:inline">More options</span>
+          </summary>
+          <div className="mt-3 space-y-3 border-t border-border pt-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="custom-category" className="text-xs">
+                  Category
+                </Label>
+                <select
+                  id="custom-category"
+                  value={category}
+                  onChange={(e) => {
+                    setCategoryTouched(true);
+                    setCategory(e.target.value as ExerciseCategory);
+                  }}
+                  className="h-8 w-full rounded-md border border-border bg-background px-2 text-xs"
+                >
+                  {CUSTOM_CATEGORY_OPTIONS.map((c) => (
+                    <option key={c} value={c}>
+                      {humanToken(c)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="custom-pattern" className="text-xs">
+                  Movement pattern
+                </Label>
+                <select
+                  id="custom-pattern"
+                  value={pattern}
+                  onChange={(e) => setPattern(e.target.value as MovementPattern)}
+                  className="h-8 w-full rounded-md border border-border bg-background px-2 text-xs"
+                >
+                  {CUSTOM_PATTERN_OPTIONS.map((p) => (
+                    <option key={p} value={p}>
+                      {humanToken(p)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <MuscleMultiSelect
+              label="Secondary muscles"
+              aria-label="Secondary muscles"
+              value={secondaryMuscles}
+              onChange={setSecondaryMuscles}
+              exclude={primaryMuscles}
+            />
+          </div>
+        </details>
+      </div>
+
+      <DialogFooter className="border-t border-border px-6 py-4">
+        <Button variant="outline" onClick={onBack}>
+          Cancel
+        </Button>
+        <Button onClick={() => void submit()} disabled={primaryMuscles.length === 0}>
+          <Plus aria-hidden />
+          Add exercise
+        </Button>
+      </DialogFooter>
+    </div>
+  );
+}
+
 /**
  * Catalog-search dialog for adding an exercise. Exact + fuzzy match via
  * `createCatalog()`. Uncatalogued names are allowed (`unknown:<slug>`), matching
@@ -49,15 +194,14 @@ function humanCategory(c: ExerciseDef['category']): string {
 export function ExerciseSearchDialog({ open, onOpenChange, onPick }: ExerciseSearchDialogProps) {
   const catalog = useCatalog();
   const [query, setQuery] = useState('');
+  const [createName, setCreateName] = useState<string | null>(null);
 
   const results = useMemo(() => {
     const all = catalog.all();
     const q = query.trim().toLowerCase();
     if (!q) {
-      // No query → a sensible alphabetical browse of the whole catalog.
       return [...all].sort((a, b) => a.canonicalName.localeCompare(b.canonicalName));
     }
-    // Rank: name/alias substring hits first, then everything else.
     const scored = all
       .map((d) => {
         const name = d.canonicalName.toLowerCase();
@@ -74,141 +218,119 @@ export function ExerciseSearchDialog({ open, onOpenChange, onPick }: ExerciseSea
   }, [catalog, query]);
 
   const trimmed = query.trim();
-  // Offer "add as custom" when the typed name doesn't already exist exactly.
   const canCreateCustom =
     trimmed.length > 0 &&
     !results.some((d) => d.canonicalName.toLowerCase() === trimmed.toLowerCase());
 
+  function reset() {
+    setQuery('');
+    setCreateName(null);
+  }
+
   function pick(p: ExercisePick) {
     onPick(p);
-    setQuery('');
+    reset();
     onOpenChange(false);
   }
 
-  /**
-   * Persist a typed-in name as a reusable custom exercise, then pick it. The id
-   * scheme is `custom:<slug>`; `addCustomExercise` puts by id so a repeat add of
-   * the same name is idempotent (no duplicate row, no duplicate catalog entry).
-   */
-  async function createAndPickCustom(name: string) {
-    const slug = slugify(name);
-    const id = `custom:${slug}`;
-    await repository.addCustomExercise({
-      id,
-      canonicalName: name,
-      aliases: [name.toLowerCase()],
-      category: 'push',
-      pattern: 'isolation',
-      primaryMuscles: [],
-      secondaryMuscles: [],
-    });
-    pick({ exerciseId: id, rawName: name });
+  function closeDialog(o: boolean) {
+    if (!o) reset();
+    onOpenChange(o);
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        if (!o) setQuery('');
-        onOpenChange(o);
-      }}
-    >
-      <DialogContent className="max-h-[80vh] gap-3 overflow-hidden p-0 sm:max-w-md">
-        <DialogHeader className="px-6 pt-6">
-          <DialogTitle>Add exercise</DialogTitle>
-          <DialogDescription>Search the catalog, or type a name to add your own.</DialogDescription>
-        </DialogHeader>
-
-        <div className="px-6">
-          <div className="relative">
-            <Search
-              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-              strokeWidth={1.75}
-              aria-hidden
+    <Dialog open={open} onOpenChange={closeDialog}>
+      <DialogContent className="flex max-h-[80vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-md">
+        {createName ? (
+          <>
+            <DialogHeader className="px-6 pt-6">
+              <DialogTitle>Custom exercise</DialogTitle>
+              <DialogDescription>Tag the muscles this lift trains.</DialogDescription>
+            </DialogHeader>
+            <CustomExerciseCreateForm
+              name={createName}
+              onBack={() => setCreateName(null)}
+              onCreated={pick}
             />
-            <Input
-              autoFocus
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Bench press, squat, curl…"
-              className="pl-9"
-              aria-label="Search exercises"
-            />
-          </div>
-        </div>
+          </>
+        ) : (
+          <>
+            <DialogHeader className="gap-3 px-6 pt-6">
+              <DialogTitle>Add exercise</DialogTitle>
+              <DialogDescription>Search the catalog, or type a name to add your own.</DialogDescription>
+            </DialogHeader>
 
-        <ul className="max-h-[52vh] overflow-y-auto px-3 pb-3" role="listbox" aria-label="Exercise results">
-          {canCreateCustom ? (
-            <li>
-              <button
-                type="button"
-                onClick={() => void createAndPickCustom(trimmed)}
-                className={cn(
-                  'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors',
-                  'hover:bg-surface-elevated focus-visible:bg-surface-elevated focus-visible:outline-none',
-                )}
-              >
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-highlight-muted text-highlight">
-                  <Plus className="size-4" strokeWidth={2} aria-hidden />
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-medium text-foreground">
-                    Add “{trimmed}”
-                  </span>
-                  <span className="block text-xs text-muted-foreground">Custom exercise</span>
-                </span>
-              </button>
-            </li>
-          ) : null}
+            <div className="px-6">
+              <div className="relative">
+                <Search
+                  className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                  strokeWidth={1.75}
+                  aria-hidden
+                />
+                <Input
+                  autoFocus
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Bench press, squat, curl…"
+                  className="pl-9"
+                  aria-label="Search exercises"
+                />
+              </div>
+            </div>
 
-          {results.map((d) => (
-            <li key={d.id}>
-              <button
-                type="button"
-                onClick={() => pick({ exerciseId: d.id, rawName: d.canonicalName })}
-                className={cn(
-                  'flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left transition-colors',
-                  'hover:bg-surface-elevated focus-visible:bg-surface-elevated focus-visible:outline-none',
-                )}
-              >
-                <span className="min-w-0 truncate text-sm font-medium text-foreground">
-                  {d.canonicalName}
-                </span>
-                <Badge variant="outline" className="shrink-0">
-                  {humanCategory(d.category)}
-                </Badge>
-              </button>
-            </li>
-          ))}
+            <ul className="max-h-[52vh] overflow-y-auto px-3 pb-3" role="listbox" aria-label="Exercise results">
+              {canCreateCustom ? (
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => setCreateName(trimmed)}
+                    className={cn(
+                      'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors',
+                      'hover:bg-surface-elevated focus-visible:bg-surface-elevated focus-visible:outline-none',
+                    )}
+                  >
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-highlight-muted text-highlight">
+                      <Plus className="size-4" strokeWidth={2} aria-hidden />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-medium text-foreground">
+                        Add “{trimmed}”
+                      </span>
+                      <span className="block text-xs text-muted-foreground">Custom exercise — tag muscles</span>
+                    </span>
+                  </button>
+                </li>
+              ) : null}
 
-          {results.length === 0 && !canCreateCustom ? (
-            <li className="px-3 py-6 text-center text-sm text-muted-foreground">
-              No matches. Keep typing to add a custom exercise.
-            </li>
-          ) : null}
-        </ul>
+              {results.map((d) => (
+                <li key={d.id}>
+                  <button
+                    type="button"
+                    onClick={() => pick({ exerciseId: d.id, rawName: d.canonicalName })}
+                    className={cn(
+                      'flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left transition-colors',
+                      'hover:bg-surface-elevated focus-visible:bg-surface-elevated focus-visible:outline-none',
+                    )}
+                  >
+                    <span className="min-w-0 truncate text-sm font-medium text-foreground">
+                      {d.canonicalName}
+                    </span>
+                    <Badge variant="outline" className="shrink-0">
+                      {humanCategory(d.category)}
+                    </Badge>
+                  </button>
+                </li>
+              ))}
+
+              {results.length === 0 && !canCreateCustom ? (
+                <li className="px-3 py-6 text-center text-sm text-muted-foreground">
+                  No matches. Keep typing to add a custom exercise.
+                </li>
+              ) : null}
+            </ul>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
-}
-
-function slugify(name: string): string {
-  const base = name
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-  // Deterministic fallback (e.g. an emoji-only name slugs to ''): hash the
-  // lowercased name so the same input always yields the same id — custom
-  // exercises must persist + de-dupe by a stable `custom:<slug>` key.
-  return base || `x${hashName(name.trim().toLowerCase())}`;
-}
-
-/** Small stable string hash (djb2) → base36, for deterministic slug fallback. */
-function hashName(s: string): string {
-  let h = 5381;
-  for (let i = 0; i < s.length; i++) {
-    h = ((h << 5) + h + s.charCodeAt(i)) | 0;
-  }
-  return (h >>> 0).toString(36);
 }
