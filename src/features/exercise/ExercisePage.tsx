@@ -1,14 +1,17 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { motion, useReducedMotion } from 'motion/react';
 import { ArrowLeft, Dumbbell, LineChart, ListOrdered, Trophy } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { StatCard } from '@/components/StatCard';
+import { WarmupBadge } from '@/components/WarmupBadge';
 import { LineChartCard } from '@/components/charts/LineChartCard';
 import { Button } from '@/components/ui/button';
 import { useBests, useSettings, useWorkouts } from '@/data/hooks';
 import { createCatalog } from '@/parser/catalog';
+import { db } from '@/data/db';
 import { formatWeight } from '@/lib/units';
 import type { MuscleGroup, RepPR } from '@/types/models';
 import { SegmentedControl } from './SegmentedControl';
@@ -57,11 +60,13 @@ export default function ExercisePage() {
 
   const unit = settings.unit;
 
+  // Persisted custom exercises so `custom:*` ids resolve to their canonical def.
+  const custom = useLiveQuery(() => db.customExercises.toArray(), [], []);
   const def = useMemo(() => {
     if (!id) return null;
-    const catalog = createCatalog();
+    const catalog = createCatalog(custom);
     return catalog.all().find((d) => d.id === id) ?? null;
-  }, [id]);
+  }, [id, custom]);
 
   const best = useMemo(
     () => (id ? bests.find((b) => b.exerciseId === id) ?? null : null),
@@ -94,7 +99,7 @@ export default function ExercisePage() {
   const name = useMemo(() => {
     if (def) return def.canonicalName;
     if (!id) return 'Exercise';
-    const slug = id.replace(/^unknown:/, '').replace(/[-_]/g, ' ');
+    const slug = id.replace(/^(unknown|custom):/, '').replace(/[-_]/g, ' ');
     return slug.replace(/\b\w/g, (c) => c.toUpperCase()) || id;
   }, [def, id]);
 
@@ -212,6 +217,7 @@ export default function ExercisePage() {
               </h2>
               <SegmentedControl
                 size="compact"
+                scroll
                 ariaLabel="Time range"
                 options={RANGES.map((r) => ({ value: r.key, label: r.label }))}
                 value={range}
@@ -221,11 +227,11 @@ export default function ExercisePage() {
 
             <div className="mb-4">
               <SegmentedControl
+                scroll
                 ariaLabel="Progression metric"
-                options={METRICS.map((m) => ({ value: m.key, label: m.short }))}
+                options={METRICS.map((m) => ({ value: m.key, label: m.short, title: m.label }))}
                 value={metric}
                 onChange={setMetric}
-                className="flex-wrap"
               />
             </div>
 
@@ -342,9 +348,7 @@ function SessionCard({
             >
               <span className="flex items-center gap-2">
                 {set.isWarmup ? (
-                  <span className="rounded bg-surface px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                    Warm-up
-                  </span>
+                  <WarmupBadge />
                 ) : (
                   <span className="tnum w-5 text-center text-xs text-muted-foreground">
                     {setNo}
