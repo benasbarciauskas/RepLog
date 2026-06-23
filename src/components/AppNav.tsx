@@ -1,15 +1,13 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Dumbbell, MoreHorizontal, X } from 'lucide-react';
+import { MoreHorizontal, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { NAV_ITEMS, PRIMARY_ACTION_TO } from './nav-items';
 
 function Wordmark({ className }: { className?: string }) {
   return (
     <div className={cn('flex items-center gap-2', className)}>
-      <span className="flex size-8 items-center justify-center rounded-lg bg-highlight text-highlight-foreground">
-        <Dumbbell className="size-5" strokeWidth={2.25} aria-hidden />
-      </span>
+      <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="RepLog logo" className="size-8 rounded-lg" />
       <span className="text-lg font-semibold tracking-tight text-foreground">
         Rep<span className="text-highlight">Log</span>
       </span>
@@ -255,7 +253,10 @@ function MoreSheet({
 /** Mobile top bar carrying the wordmark (sidebar covers desktop). */
 export function MobileTopBar() {
   return (
-    <header className="sticky top-0 z-20 flex h-14 items-center border-b border-border bg-surface/80 px-4 backdrop-blur-md md:hidden">
+    <header
+      className="sticky top-0 z-20 flex h-14 items-center border-b border-border bg-surface/80 px-4 backdrop-blur-md md:hidden"
+      style={{ paddingTop: 'env(safe-area-inset-top)' }}
+    >
       <Wordmark />
     </header>
   );
