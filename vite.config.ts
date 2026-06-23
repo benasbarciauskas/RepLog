@@ -5,7 +5,12 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
+// Base path: '/' for local dev and root hosts; '/RepLog/' on GitHub Pages
+// (the deploy workflow sets VITE_BASE). Router + PWA manifest derive from this.
+const base = process.env.VITE_BASE || '/';
+
 export default defineConfig({
+  base,
   plugins: [
     react(),
     tailwindcss(),
@@ -24,8 +29,8 @@ export default defineConfig({
         background_color: '#0c0d0f',
         display: 'standalone',
         orientation: 'portrait',
-        start_url: '/',
-        scope: '/',
+        start_url: base,
+        scope: base,
         icons: [
           { src: 'pwa-64x64.png', sizes: '64x64', type: 'image/png' },
           { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
@@ -45,7 +50,7 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2}'],
         // Don't precache the OCR engine assets (multi-MB, lazy on Import).
         globIgnores: ['**/tesseract*/**'],
-        navigateFallback: '/index.html',
+        navigateFallback: base + 'index.html',
         cleanupOutdatedCaches: true,
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
       },

@@ -72,7 +72,7 @@ describe('balanceScore', () => {
   });
 
   it('drops the overall AND the push area for a big OHP/bench deficit', () => {
-    // Strong bench, weak OHP → ohp-bench ratio way below band.
+    // Heavy bench, weak OHP → ohp-bench ratio way below band.
     const balanced = balanceScore([
       best('barbell-bench-press', 100),
       best('overhead-press', 63),

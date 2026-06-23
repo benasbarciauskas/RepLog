@@ -8,15 +8,13 @@ what is lacking, which muscles are underdeveloped relative to their antagonists.
 Everything runs **on your own device**. There is no account, no server, and no
 cost. Your data lives in your browser and never leaves it.
 
-> Replace `<LIVE_URL>` below with the deployed address once RepLog is live.
-
 ---
 
 ## A. Use it (phone or laptop)
 
 RepLog is a website you can also install like an app.
 
-1. Open **`<LIVE_URL>`** in your browser.
+1. Open **`https://benasbarciauskas.github.io/RepLog/`** in your browser.
 2. Install it to your home screen so it opens full-screen and works offline:
    - **iPhone / iPad (Safari):** tap the **Share** button, then
      **Add to Home Screen**.
@@ -79,7 +77,21 @@ bests, PR timeline, bodyweight trend, split history) and your Coach
 
 ---
 
-## C. Run from source (developers)
+## C. Log a workout live
+
+Beyond importing past notes, you can log sessions as you train.
+
+1. Open **Log** (the centre tab) and tap **Start empty workout** — or start from a saved **Routine**.
+2. Tap **Add exercise** and search the catalog (or add your own).
+3. For each set, enter weight and reps. The **PREV** column shows what you lifted last time. Mark a set done with the check, and a **rest timer** starts automatically (adjust or skip it). Tap **plates** to see the plates per side. Flag warm-up sets and log **RPE** if you want.
+4. Add sets and exercises as you go. The session saves continuously, so you can close the app and resume right where you left off.
+5. Tap **Finish** to review and save the session (it joins your history and updates the Dashboard + Coach), or **Discard** to drop it.
+
+**Save as a routine:** turn the current session into a reusable template from the logger, then start future workouts from **Routines** in one tap.
+
+---
+
+## D. Run from source (developers)
 
 RepLog is a static React + Vite app with no backend.
 
@@ -105,7 +117,9 @@ npm run build      # outputs static files to dist/
 npm run preview    # preview the production build locally
 ```
 
-Deploy the `dist/` folder to any static host. **Vercel** is the reference target:
+Deploy the `dist/` folder to any static host. This repo ships to **GitHub Pages**
+via `.github/workflows/deploy.yml` (it builds with the `/RepLog/` base path). Any
+static host works, though — for example, **Vercel**:
 
 1. Import the repo into Vercel (framework preset: **Vite**).
 2. Build command `npm run build`, output directory `dist`.
@@ -129,7 +143,7 @@ npm run lint    # eslint
 
 ---
 
-## D. Mobile app via Expo (coming, separate repo)
+## E. Mobile app via Expo (coming, separate repo)
 
 A native iOS/Android RepLog is planned as a **separate Expo / React Native repo**
 that reuses this web app's parser, analytics, and coach logic (the framework-free

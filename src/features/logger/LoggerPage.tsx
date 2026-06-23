@@ -38,7 +38,7 @@ import { ConfirmDialog } from './ConfirmDialog';
  * The live workout logger (`/log`).
  *
  * - No active session → an empty state to start a blank workout or pick a routine.
- * - Active session → the Strong-style logging view: elapsed timer, per-exercise
+ * - Active session → the live logging view: elapsed timer, per-exercise
  *   cards with set rows (previous / weight / reps / RPE / warm-up / done),
  *   auto-starting rest timer, plate calculator, finish / discard / save-as-routine.
  *

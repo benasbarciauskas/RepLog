@@ -89,7 +89,7 @@ function statusFor(score: number): ScoreStatus {
 }
 
 /**
- * Higher-level "areas" grouped from the underlying ratio rules, so the Umax-style
+ * Higher-level "areas" grouped from the underlying ratio rules, so the
  * sub-gauges can show push/pull and upper/lower in addition to per-ratio scores.
  * Each area names the rule ids that contribute to it.
  */

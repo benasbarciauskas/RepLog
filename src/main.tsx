@@ -17,7 +17,7 @@ createRoot(document.getElementById('root')!).render(
     {/* Theme-locked to dark (html.dark). forcedTheme keeps sonner + any
         next-themes consumer rendering the dark palette. */}
     <ThemeProvider attribute="class" forcedTheme="dark" enableSystem={false}>
-      <BrowserRouter>
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
         <App />
       </BrowserRouter>
     </ThemeProvider>
