@@ -10,6 +10,7 @@ import type {
   AppSettings,
   CoachFinding,
   ExerciseBest,
+  Program,
   RawNote,
   Routine,
   TrainingBlock,
@@ -77,6 +78,18 @@ export function useRoutines(): Routine[] {
     () => db.routines.orderBy('updatedAt').reverse().toArray(),
     [],
     [],
+  );
+}
+
+/** The most recently updated program (single active program for v1). */
+export function useActiveProgram(): Program | undefined {
+  return useLiveQuery(
+    async () => {
+      const programs = await db.programs.orderBy('updatedAt').reverse().toArray();
+      return programs[0];
+    },
+    [],
+    undefined,
   );
 }
 

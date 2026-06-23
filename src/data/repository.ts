@@ -2,6 +2,7 @@ import type {
   ActiveSession,
   AppSettings,
   ExerciseDef,
+  Program,
   RawNote,
   Routine,
   SetEntry,
@@ -75,6 +76,10 @@ export interface Repository {
   getSettings(): Promise<AppSettings>;
   saveSettings(s: AppSettings): Promise<void>;
 
+  getActiveProgram(): Promise<Program | undefined>;
+  saveProgram(p: Program): Promise<void>;
+  deleteProgram(id: string): Promise<void>;
+
   exportData(): Promise<Blob>;
   importData(json: string | object): Promise<void>;
 
@@ -95,6 +100,7 @@ export type RepLogExportFile = {
     customExercises?: ExerciseDef[];
     routines?: Routine[];
     settings?: (AppSettings & { id: string })[];
+    programs?: Program[];
   };
 };
 
@@ -216,13 +222,27 @@ export class LocalRepository implements Repository {
     await db.settings.put({ ...s, id: SETTINGS_KEY });
   }
 
+  async getActiveProgram(): Promise<Program | undefined> {
+    const programs = await db.programs.orderBy('updatedAt').reverse().toArray();
+    return programs[0];
+  }
+
+  async saveProgram(p: Program): Promise<void> {
+    await db.programs.put(p);
+  }
+
+  async deleteProgram(id: string): Promise<void> {
+    await db.programs.delete(id);
+  }
+
   async exportData(): Promise<Blob> {
-    const [notes, workouts, customExercises, routines, settings] = await Promise.all([
+    const [notes, workouts, customExercises, routines, settings, programs] = await Promise.all([
       db.notes.toArray(),
       db.workouts.toArray(),
       db.customExercises.toArray(),
       db.routines.toArray(),
       db.settings.toArray(),
+      db.programs.toArray(),
     ]);
 
     const safeSettings = settings.map((s) => {
@@ -235,7 +255,7 @@ export class LocalRepository implements Repository {
       app: EXPORT_APP,
       version: EXPORT_VERSION,
       exportedAt: new Date().toISOString(),
-      data: { notes, workouts, customExercises, routines, settings: safeSettings },
+      data: { notes, workouts, customExercises, routines, settings: safeSettings, programs },
     };
 
     return new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -250,7 +270,14 @@ export class LocalRepository implements Repository {
     }
 
     const data = parsed.data ?? {};
-    const importTables = [db.notes, db.workouts, db.customExercises, db.routines, db.settings];
+    const importTables = [
+      db.notes,
+      db.workouts,
+      db.customExercises,
+      db.routines,
+      db.settings,
+      db.programs,
+    ];
 
     await db.transaction('rw', importTables, async () => {
       if (data.notes !== undefined) {
@@ -280,6 +307,11 @@ export class LocalRepository implements Repository {
         await db.settings.clear();
         if (data.settings.length > 0) await db.settings.bulkPut(data.settings);
       }
+      if (data.programs !== undefined) {
+        if (!Array.isArray(data.programs)) throw new Error('Invalid backup: "programs" must be an array');
+        await db.programs.clear();
+        if (data.programs.length > 0) await db.programs.bulkPut(data.programs);
+      }
     });
   }
 
@@ -292,6 +324,7 @@ export class LocalRepository implements Repository {
       db.activeSession,
       db.routines,
       db.settings,
+      db.programs,
     ];
     await db.transaction('rw', tables, async () => {
       await Promise.all(tables.map((t) => t.clear()));

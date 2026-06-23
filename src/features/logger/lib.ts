@@ -2,6 +2,7 @@ import type {
   ActiveExercise,
   ActiveSession,
   ActiveSet,
+  ProgramDay,
   Routine,
   Workout,
 } from '@/types/models';
@@ -214,6 +215,26 @@ export function makeActiveExercise(
  * with `targetSets` empty set rows (min 1) and the routine's `restSeconds`
  * carried over. `routineId` is stamped so the session knows its origin.
  */
+/**
+ * Seed an `ActiveSession` from a program day: one exercise per entry, each with
+ * `targetSets` empty set rows and the day's `restSeconds` carried over.
+ */
+export function sessionFromProgramDay(day: ProgramDay): ActiveSession {
+  return {
+    id: newId(),
+    startedAt: new Date().toISOString(),
+    routineId: null,
+    bodyweightKg: null,
+    splitCanonical: day.splitCanonical,
+    exercises: day.exercises.map((e) =>
+      makeActiveExercise(e.exerciseId, e.rawName, {
+        restSeconds: e.restSeconds,
+        sets: e.targetSets,
+      }),
+    ),
+  };
+}
+
 export function sessionFromRoutine(routine: Routine): ActiveSession {
   return {
     id: newId(),

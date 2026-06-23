@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { SETTINGS_KEY, db } from './db';
 import { DEFAULT_SETTINGS, LocalRepository } from './repository';
-import type { Workout } from '@/types/models';
+import type { Program, Workout } from '@/types/models';
 
 const repo = new LocalRepository();
 
@@ -62,17 +62,23 @@ describe('LocalRepository — export/import', () => {
     expect(exported.data.notes).toEqual([]);
     expect(exported.data.customExercises).toEqual([]);
     expect(exported.data.routines).toEqual([]);
+    expect(exported.data.programs).toEqual([]);
     expect(exported.data).not.toHaveProperty('activeSession');
 
-    await db.transaction('rw', [db.notes, db.workouts, db.customExercises, db.routines, db.settings], async () => {
-      await Promise.all([
-        db.notes.clear(),
-        db.workouts.clear(),
-        db.customExercises.clear(),
-        db.routines.clear(),
-        db.settings.clear(),
-      ]);
-    });
+    await db.transaction(
+      'rw',
+      [db.notes, db.workouts, db.customExercises, db.routines, db.settings, db.programs],
+      async () => {
+        await Promise.all([
+          db.notes.clear(),
+          db.workouts.clear(),
+          db.customExercises.clear(),
+          db.routines.clear(),
+          db.settings.clear(),
+          db.programs.clear(),
+        ]);
+      },
+    );
 
     expect(await repo.getWorkouts()).toHaveLength(0);
 
@@ -100,6 +106,55 @@ describe('LocalRepository — export/import', () => {
     expect(exported.data.settings).toHaveLength(1);
     expect(exported.data.settings[0]).not.toHaveProperty('aiApiKey');
     expect(exported.data.settings[0].aiModel).toBe('meta-llama/llama-3.3-70b-instruct:free');
+  });
+
+  it('exports and imports programs without sensitive fields', async () => {
+    const program: Program = {
+      id: 'p1',
+      name: 'Hypertrophy · 3-day Full Body',
+      config: {
+        goal: 'hypertrophy',
+        experience: 'beginner',
+        daysPerWeek: 3,
+        split: 'auto',
+        minutesPerSession: 60,
+      },
+      days: [
+        {
+          name: 'Full Body 1',
+          splitCanonical: 'full-body',
+          exercises: [
+            {
+              exerciseId: 'back-squat',
+              rawName: 'Back Squat',
+              targetSets: 3,
+              repRange: [8, 12],
+              rir: 2,
+              restSeconds: 150,
+            },
+          ],
+        },
+      ],
+      createdAt: '2026-06-01T00:00:00.000Z',
+      updatedAt: '2026-06-01T00:00:00.000Z',
+    };
+
+    await repo.saveProgram(program);
+
+    const blob = await repo.exportData();
+    const exported = JSON.parse(await readBlobText(blob));
+
+    expect(exported.data.programs).toHaveLength(1);
+    expect(exported.data.programs[0].id).toBe('p1');
+    expect(exported.data.programs[0]).not.toHaveProperty('aiApiKey');
+
+    await db.programs.clear();
+    expect(await repo.getActiveProgram()).toBeUndefined();
+
+    await repo.importData(exported);
+    const restored = await repo.getActiveProgram();
+    expect(restored?.id).toBe('p1');
+    expect(restored?.days[0].exercises[0].exerciseId).toBe('back-squat');
   });
 
   it('rejects backups from other apps', async () => {

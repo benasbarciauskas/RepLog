@@ -154,6 +154,46 @@ export interface Routine {
   updatedAt: string;          // ISO datetime
 }
 
+// ---------------------------------------------------------------------------
+// v1.2 program generator — research-based, on-device workout plans.
+// ---------------------------------------------------------------------------
+
+export type ProgramGoal = 'hypertrophy' | 'strength';
+export type Experience = 'beginner' | 'intermediate' | 'advanced';
+export type SplitChoice = 'auto' | 'full-body' | 'push-pull-legs' | 'upper-lower';
+
+export interface ProgramConfig {
+  goal: ProgramGoal;
+  experience: Experience;
+  daysPerWeek: number;
+  split: SplitChoice;
+  minutesPerSession: number;
+}
+
+export interface ProgramDayExercise {
+  exerciseId: string;
+  rawName: string;
+  targetSets: number;
+  repRange: [number, number];
+  rir: number;
+  restSeconds: number;
+}
+
+export interface ProgramDay {
+  name: string;
+  splitCanonical: SplitCanonical;
+  exercises: ProgramDayExercise[];
+}
+
+export interface Program {
+  id: string;
+  name: string;
+  config: ProgramConfig;
+  days: ProgramDay[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 /** App-wide preferences for the logger (bar/plate config, rest, display unit). */
 export interface AppSettings {
   barWeightKg: number;

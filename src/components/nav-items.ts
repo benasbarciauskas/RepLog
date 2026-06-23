@@ -7,6 +7,7 @@ import {
   History,
   TrendingUp,
   ClipboardCheck,
+  CalendarRange,
   Settings,
   type LucideProps,
 } from 'lucide-react';
@@ -36,6 +37,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/history', label: 'History', icon: History, primary: true },
   { to: '/trends', label: 'Trends', icon: TrendingUp, primary: false },
   { to: '/routines', label: 'Routines', icon: ListChecks, primary: false },
+  { to: '/program', label: 'Program', icon: CalendarRange, primary: false },
   { to: '/import', label: 'Import', icon: Upload, primary: false },
   { to: '/review', label: 'Review', icon: ClipboardCheck, primary: false },
   { to: '/settings', label: 'Settings', icon: Settings, primary: false },
