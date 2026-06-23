@@ -219,4 +219,18 @@ describe('weeklyMuscleVolume', () => {
     }
     expect(report.muscles[0].muscle).toBe('chest');
   });
+
+  it('reports every muscle setsPerWeek === 0 when all workouts fall outside the trailing window', () => {
+    // anchor = '2026-06-20', window = 4 weeks → start = '2026-05-24'.
+    // The workout is dated '2026-05-23', one day before the window opens.
+    const w = [workout('2026-05-23', [ex('bench', 8)])];
+    const report = weeklyMuscleVolume(w, lookup(), { weeks: 4, anchor: '2026-06-20' });
+    // anchorDate is set to the explicit anchor (workouts list is non-empty at call site;
+    // the anchor opt is passed directly so anchorDate reflects it).
+    expect(report.anchorDate).toBe('2026-06-20');
+    // No in-window sets → every muscle is zero.
+    expect(report.muscles.every((m) => m.setsPerWeek === 0)).toBe(true);
+    // Classification should be 'never' for all.
+    expect(report.muscles.every((m) => m.status === 'never')).toBe(true);
+  });
 });

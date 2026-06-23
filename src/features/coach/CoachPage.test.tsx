@@ -174,4 +174,66 @@ describe('CoachPage', { timeout: 20000 }, () => {
     // A never chip for hamstrings (setsPerWeek 0 → '0/wk').
     expect(screen.getByText(/Hamstrings · 0\/wk/)).toBeInTheDocument();
   });
+
+  it('shows gentle note when workouts exist but every muscle has zero in-window sets', async () => {
+    workoutsMock.mockReturnValue([benchWorkout]);
+    bestsMock.mockReturnValue(scorableBests);
+    findingsMock.mockReturnValue([]);
+    // anchorDate non-null (workouts exist in the DB) but all setsPerWeek === 0
+    // — simulates workouts that all fall outside the trailing 4-week window.
+    volumeMock.mockReturnValue({
+      weeks: 4,
+      anchorDate: '2023-01-01',
+      muscles: [
+        muscleVol('chest', 0, 'never'),
+        muscleVol('quads', 0, 'never'),
+        muscleVol('hamstrings', 0, 'never'),
+      ],
+    });
+
+    await renderCoach();
+
+    expect(
+      screen.getByText(/no working sets in the last 4 weeks/i),
+    ).toBeInTheDocument();
+  });
+
+  it('shows the optimal card when at least one muscle is in the sweet spot', async () => {
+    workoutsMock.mockReturnValue([benchWorkout]);
+    bestsMock.mockReturnValue(scorableBests);
+    findingsMock.mockReturnValue([]);
+    volumeMock.mockReturnValue({
+      weeks: 4,
+      anchorDate: '2023-07-10',
+      muscles: [
+        muscleVol('chest', 12, 'optimal'),
+        muscleVol('quads', 0, 'never'),
+      ],
+    });
+
+    await renderCoach();
+
+    expect(screen.getByText(/in the sweet spot \(8.20 sets\/wk\)/i)).toBeInTheDocument();
+    // The chip for the optimal muscle should appear.
+    expect(screen.getByText(/Chest · 12\/wk/)).toBeInTheDocument();
+  });
+
+  it('shows the high-volume note and chip when at least one muscle is above 20 sets/wk', async () => {
+    workoutsMock.mockReturnValue([benchWorkout]);
+    bestsMock.mockReturnValue(scorableBests);
+    findingsMock.mockReturnValue([]);
+    volumeMock.mockReturnValue({
+      weeks: 4,
+      anchorDate: '2023-07-10',
+      muscles: [
+        muscleVol('chest', 24, 'high'),
+        muscleVol('quads', 0, 'never'),
+      ],
+    });
+
+    await renderCoach();
+
+    expect(screen.getByText(/above ~20 sets\/wk — watch recovery/i)).toBeInTheDocument();
+    expect(screen.getByText(/Chest · 24\/wk/)).toBeInTheDocument();
+  });
 });
